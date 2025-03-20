@@ -7,25 +7,26 @@ const { Builder, By, Key, until, Actions } = pkg;
 import { Options as ChromeOptions } from "selenium-webdriver/chrome.js";
 import { Options as FirefoxOptions } from "selenium-webdriver/firefox.js";
 
-// Création du serveur MCP
-const server = new McpServer({
+// Création d'une classe dérivée pour forcer la propriété "tools"
+class McpServerFixed extends McpServer {
+  constructor(...args) {
+    super(...args);
+    // Forcer l'initialisation de "tools" avec une liste vide si nécessaire
+    if (!this.tools) {
+      this.tools = { list: [] };
+    }
+  }
+  // Surclassement de la méthode tool pour enregistrer les outils dans tools.list
+  tool(name, description, schema, handler) {
+    this.tools.list.push({ name, description, schema });
+    return super.tool(name, description, schema, handler);
+  }
+}
+
+const server = new McpServerFixed({
   name: "MCP Selenium",
   version: "1.0.0"
 });
-
-// Forcer la définition de la propriété "tools" pour qu'elle soit toujours accessible
-Object.defineProperty(server, "tools", {
-  value: { list: [] },
-  writable: true,
-  configurable: true,
-});
-
-// Surclassement de la méthode server.tool afin d'enregistrer les outils dans server.tools.list
-const originalTool = server.tool.bind(server);
-server.tool = (name, description, schema, handler) => {
-  server.tools.list.push({ name, description, schema });
-  return originalTool(name, description, schema, handler);
-};
 
 // État du serveur
 const state = {
