@@ -7,16 +7,16 @@ const { Builder, By, Key, until, Actions } = pkg;
 import { Options as ChromeOptions } from "selenium-webdriver/chrome.js";
 import { Options as FirefoxOptions } from "selenium-webdriver/firefox.js";
 
-// Création d'une classe dérivée pour forcer la propriété "tools"
+// --- Utiliser une classe personnalisée pour forcer l'initialisation de "tools" ---
 class McpServerFixed extends McpServer {
-  constructor(...args) {
-    super(...args);
-    // Forcer l'initialisation de "tools" avec une liste vide si nécessaire
-    if (!this.tools) {
+  constructor(options) {
+    super(options);
+    // Si "tools" ou "tools.list" n'est pas défini, l'initialiser
+    if (!this.tools || !this.tools.list) {
       this.tools = { list: [] };
     }
   }
-  // Surclassement de la méthode tool pour enregistrer les outils dans tools.list
+  // Surcharge de la méthode tool pour enregistrer les métadonnées dans tools.list
   tool(name, description, schema, handler) {
     this.tools.list.push({ name, description, schema });
     return super.tool(name, description, schema, handler);
@@ -28,13 +28,13 @@ const server = new McpServerFixed({
   version: "1.0.0"
 });
 
-// État du serveur
+// --- État du serveur ---
 const state = {
   drivers: new Map(),
   currentSession: null,
 };
 
-// Fonctions utilitaires
+// --- Fonctions utilitaires ---
 const getDriver = () => {
   const driver = state.drivers.get(state.currentSession);
   if (!driver) {
@@ -62,7 +62,7 @@ const getLocator = (by, value) => {
   }
 };
 
-// Schémas communs
+// --- Schémas communs ---
 const browserOptionsSchema = z
   .object({
     headless: z.boolean().optional().describe("Run browser in headless mode"),
@@ -78,7 +78,7 @@ const locatorSchema = {
   timeout: z.number().optional().describe("Maximum time to wait for element in milliseconds"),
 };
 
-// Outil de gestion du navigateur
+// --- Outils de gestion du navigateur ---
 server.tool(
   "start_browser",
   "Launches a browser session",
@@ -147,7 +147,7 @@ server.tool(
   }
 );
 
-// Outils d'interaction avec les éléments
+// --- Outils d'interaction avec les éléments ---
 server.tool(
   "find_element",
   "Finds an element",
@@ -355,7 +355,7 @@ server.tool(
   }
 );
 
-// Définition d'une ressource pour afficher le statut du navigateur
+// --- Définition d'une ressource pour afficher le statut du navigateur ---
 server.resource(
   "browser-status",
   new ResourceTemplate("browser-status://current"),
@@ -371,7 +371,7 @@ server.resource(
   })
 );
 
-// Handler de nettoyage pour fermer les sessions du navigateur lors de l'arrêt
+// --- Handler de nettoyage pour fermer les sessions du navigateur lors de l'arrêt ---
 async function cleanup() {
   for (const [sessionId, driver] of state.drivers) {
     try {
@@ -388,6 +388,6 @@ async function cleanup() {
 process.on("SIGTERM", cleanup);
 process.on("SIGINT", cleanup);
 
-// Démarrage du serveur via le transport Stdio
+// --- Démarrage du serveur via le transport Stdio ---
 const transport = new StdioServerTransport();
 await server.connect(transport);

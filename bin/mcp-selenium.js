@@ -9,7 +9,7 @@ const __dirname = dirname(__filename);
 
 const serverPath = resolve(__dirname, '../src/lib/server.js');
 
-// Start the server
+// Démarre le serveur en lançant "node serverPath"
 const child = spawn('node', [serverPath], {
     stdio: 'inherit'
 });
@@ -19,11 +19,10 @@ child.on('error', (error) => {
     process.exit(1);
 });
 
-// Handle process termination
+// Gestion de l'arrêt du processus
 process.on('SIGTERM', () => {
     child.kill('SIGTERM');
 });
-
 process.on('SIGINT', () => {
     child.kill('SIGINT');
 });
