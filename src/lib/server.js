@@ -7,17 +7,16 @@ const { Builder, By, Key, until, Actions } = pkg;
 import { Options as ChromeOptions } from 'selenium-webdriver/chrome.js';
 import { Options as FirefoxOptions } from 'selenium-webdriver/firefox.js';
 
+// Forcer l'initialisation de "tools" sur le prototype pour que server.tools.list soit défini
+McpServer.prototype.tools = { list: [] };
+
 // Création du serveur MCP
 const server = new McpServer({
   name: "MCP Selenium",
   version: "1.0.0"
 });
 
-// Correction : Initialiser explicitement la structure pour les outils
-if (!server.tools) {
-  server.tools = { list: [] };
-}
-// Surclasser la méthode server.tool pour ajouter chaque outil à la liste
+// Surclasser la méthode server.tool pour enregistrer chaque outil dans la liste
 const originalTool = server.tool.bind(server);
 server.tool = (name, description, schema, handler) => {
   server.tools.list.push({ name, description, schema });
@@ -63,7 +62,7 @@ const locatorSchema = {
   timeout: z.number().optional().describe("Maximum time to wait for element in milliseconds")
 };
 
-// Outils de gestion du navigateur
+// Outil de gestion du navigateur
 server.tool(
   "start_browser",
   "Launches a browser session",
