@@ -13,14 +13,14 @@ const server = new McpServer({
   version: "1.0.0"
 });
 
-// Forcer la définition de la propriété "tools" sur l'instance
+// Forcer la définition de la propriété "tools" pour qu'elle soit toujours accessible
 Object.defineProperty(server, "tools", {
   value: { list: [] },
   writable: true,
   configurable: true,
 });
 
-// Surclassement de la méthode server.tool pour enregistrer chaque outil dans la liste
+// Surclassement de la méthode server.tool afin d'enregistrer les outils dans server.tools.list
 const originalTool = server.tool.bind(server);
 server.tool = (name, description, schema, handler) => {
   server.tools.list.push({ name, description, schema });
@@ -82,9 +82,7 @@ server.tool(
   "start_browser",
   "Launches a browser session",
   {
-    browser: z
-      .enum(["chrome", "firefox"])
-      .describe("Browser to launch (chrome or firefox)"),
+    browser: z.enum(["chrome", "firefox"]).describe("Browser to launch (chrome or firefox)"),
     options: browserOptionsSchema,
   },
   async ({ browser, options = {} }) => {
@@ -100,7 +98,6 @@ server.tool(
         if (options.arguments) {
           options.arguments.forEach((arg) => chromeOptions.addArguments(arg));
         }
-
         driver = await builder.forBrowser("chrome").setChromeOptions(chromeOptions).build();
       } else {
         const firefoxOptions = new FirefoxOptions();
@@ -110,7 +107,6 @@ server.tool(
         if (options.arguments) {
           options.arguments.forEach((arg) => firefoxOptions.addArguments(arg));
         }
-
         driver = await builder.forBrowser("firefox").setFirefoxOptions(firefoxOptions).build();
       }
 
@@ -154,21 +150,15 @@ server.tool(
 server.tool(
   "find_element",
   "Finds an element",
-  {
-    ...locatorSchema,
-  },
+  { ...locatorSchema },
   async ({ by, value, timeout = 10000 }) => {
     try {
       const driver = getDriver();
       const locator = getLocator(by, value);
       await driver.wait(until.elementLocated(locator), timeout);
-      return {
-        content: [{ type: "text", text: "Element found" }],
-      };
+      return { content: [{ type: "text", text: "Element found" }] };
     } catch (e) {
-      return {
-        content: [{ type: "text", text: `Error finding element: ${e.message}` }],
-      };
+      return { content: [{ type: "text", text: `Error finding element: ${e.message}` }] };
     }
   }
 );
@@ -176,22 +166,16 @@ server.tool(
 server.tool(
   "click_element",
   "Clicks an element",
-  {
-    ...locatorSchema,
-  },
+  { ...locatorSchema },
   async ({ by, value, timeout = 10000 }) => {
     try {
       const driver = getDriver();
       const locator = getLocator(by, value);
       const element = await driver.wait(until.elementLocated(locator), timeout);
       await element.click();
-      return {
-        content: [{ type: "text", text: "Element clicked" }],
-      };
+      return { content: [{ type: "text", text: "Element clicked" }] };
     } catch (e) {
-      return {
-        content: [{ type: "text", text: `Error clicking element: ${e.message}` }],
-      };
+      return { content: [{ type: "text", text: `Error clicking element: ${e.message}` }] };
     }
   }
 );
@@ -199,10 +183,7 @@ server.tool(
 server.tool(
   "send_keys",
   "Sends keys to an element (typing)",
-  {
-    ...locatorSchema,
-    text: z.string().describe("Text to enter into the element"),
-  },
+  { ...locatorSchema, text: z.string().describe("Text to enter into the element") },
   async ({ by, value, text, timeout = 10000 }) => {
     try {
       const driver = getDriver();
@@ -210,13 +191,9 @@ server.tool(
       const element = await driver.wait(until.elementLocated(locator), timeout);
       await element.clear();
       await element.sendKeys(text);
-      return {
-        content: [{ type: "text", text: `Text "${text}" entered into element` }],
-      };
+      return { content: [{ type: "text", text: `Text "${text}" entered into element` }] };
     } catch (e) {
-      return {
-        content: [{ type: "text", text: `Error entering text: ${e.message}` }],
-      };
+      return { content: [{ type: "text", text: `Error entering text: ${e.message}` }] };
     }
   }
 );
@@ -224,22 +201,16 @@ server.tool(
 server.tool(
   "get_element_text",
   "Gets the text() of an element",
-  {
-    ...locatorSchema,
-  },
+  { ...locatorSchema },
   async ({ by, value, timeout = 10000 }) => {
     try {
       const driver = getDriver();
       const locator = getLocator(by, value);
       const element = await driver.wait(until.elementLocated(locator), timeout);
       const text = await element.getText();
-      return {
-        content: [{ type: "text", text }],
-      };
+      return { content: [{ type: "text", text }] };
     } catch (e) {
-      return {
-        content: [{ type: "text", text: `Error getting element text: ${e.message}` }],
-      };
+      return { content: [{ type: "text", text: `Error getting element text: ${e.message}` }] };
     }
   }
 );
@@ -247,9 +218,7 @@ server.tool(
 server.tool(
   "hover",
   "Moves the mouse to hover over an element",
-  {
-    ...locatorSchema,
-  },
+  { ...locatorSchema },
   async ({ by, value, timeout = 10000 }) => {
     try {
       const driver = getDriver();
@@ -257,13 +226,9 @@ server.tool(
       const element = await driver.wait(until.elementLocated(locator), timeout);
       const actions = driver.actions({ bridge: true });
       await actions.move({ origin: element }).perform();
-      return {
-        content: [{ type: "text", text: "Hovered over element" }],
-      };
+      return { content: [{ type: "text", text: "Hovered over element" }] };
     } catch (e) {
-      return {
-        content: [{ type: "text", text: `Error hovering over element: ${e.message}` }],
-      };
+      return { content: [{ type: "text", text: `Error hovering over element: ${e.message}` }] };
     }
   }
 );
@@ -273,9 +238,7 @@ server.tool(
   "Drags an element and drops it onto another element",
   {
     ...locatorSchema,
-    targetBy: z
-      .enum(["id", "css", "xpath", "name", "tag", "class"])
-      .describe("Locator strategy to find target element"),
+    targetBy: z.enum(["id", "css", "xpath", "name", "tag", "class"]).describe("Locator strategy to find target element"),
     targetValue: z.string().describe("Value for the target locator strategy"),
   },
   async ({ by, value, targetBy, targetValue, timeout = 10000 }) => {
@@ -287,13 +250,9 @@ server.tool(
       const targetElement = await driver.wait(until.elementLocated(targetLocator), timeout);
       const actions = driver.actions({ bridge: true });
       await actions.dragAndDrop(sourceElement, targetElement).perform();
-      return {
-        content: [{ type: "text", text: "Drag and drop completed" }],
-      };
+      return { content: [{ type: "text", text: "Drag and drop completed" }] };
     } catch (e) {
-      return {
-        content: [{ type: "text", text: `Error performing drag and drop: ${e.message}` }],
-      };
+      return { content: [{ type: "text", text: `Error performing drag and drop: ${e.message}` }] };
     }
   }
 );
@@ -301,9 +260,7 @@ server.tool(
 server.tool(
   "double_click",
   "Performs a double click on an element",
-  {
-    ...locatorSchema,
-  },
+  { ...locatorSchema },
   async ({ by, value, timeout = 10000 }) => {
     try {
       const driver = getDriver();
@@ -311,13 +268,9 @@ server.tool(
       const element = await driver.wait(until.elementLocated(locator), timeout);
       const actions = driver.actions({ bridge: true });
       await actions.doubleClick(element).perform();
-      return {
-        content: [{ type: "text", text: "Double click performed" }],
-      };
+      return { content: [{ type: "text", text: "Double click performed" }] };
     } catch (e) {
-      return {
-        content: [{ type: "text", text: `Error performing double click: ${e.message}` }],
-      };
+      return { content: [{ type: "text", text: `Error performing double click: ${e.message}` }] };
     }
   }
 );
@@ -325,9 +278,7 @@ server.tool(
 server.tool(
   "right_click",
   "Performs a right click (context click) on an element",
-  {
-    ...locatorSchema,
-  },
+  { ...locatorSchema },
   async ({ by, value, timeout = 10000 }) => {
     try {
       const driver = getDriver();
@@ -335,13 +286,9 @@ server.tool(
       const element = await driver.wait(until.elementLocated(locator), timeout);
       const actions = driver.actions({ bridge: true });
       await actions.contextClick(element).perform();
-      return {
-        content: [{ type: "text", text: "Right click performed" }],
-      };
+      return { content: [{ type: "text", text: "Right click performed" }] };
     } catch (e) {
-      return {
-        content: [{ type: "text", text: `Error performing right click: ${e.message}` }],
-      };
+      return { content: [{ type: "text", text: `Error performing right click: ${e.message}` }] };
     }
   }
 );
@@ -349,21 +296,15 @@ server.tool(
 server.tool(
   "press_key",
   "Simulates pressing a keyboard key",
-  {
-    key: z.string().describe("Key to press (e.g., 'Enter', 'Tab', 'a', etc.)"),
-  },
+  { key: z.string().describe("Key to press (e.g., 'Enter', 'Tab', 'a', etc.)") },
   async ({ key }) => {
     try {
       const driver = getDriver();
       const actions = driver.actions({ bridge: true });
       await actions.keyDown(key).keyUp(key).perform();
-      return {
-        content: [{ type: "text", text: `Key '${key}' pressed` }],
-      };
+      return { content: [{ type: "text", text: `Key '${key}' pressed` }] };
     } catch (e) {
-      return {
-        content: [{ type: "text", text: `Error pressing key: ${e.message}` }],
-      };
+      return { content: [{ type: "text", text: `Error pressing key: ${e.message}` }] };
     }
   }
 );
@@ -371,23 +312,16 @@ server.tool(
 server.tool(
   "upload_file",
   "Uploads a file using a file input element",
-  {
-    ...locatorSchema,
-    filePath: z.string().describe("Absolute path to the file to upload"),
-  },
+  { ...locatorSchema, filePath: z.string().describe("Absolute path to the file to upload") },
   async ({ by, value, filePath, timeout = 10000 }) => {
     try {
       const driver = getDriver();
       const locator = getLocator(by, value);
       const element = await driver.wait(until.elementLocated(locator), timeout);
       await element.sendKeys(filePath);
-      return {
-        content: [{ type: "text", text: "File upload initiated" }],
-      };
+      return { content: [{ type: "text", text: "File upload initiated" }] };
     } catch (e) {
-      return {
-        content: [{ type: "text", text: `Error uploading file: ${e.message}` }],
-      };
+      return { content: [{ type: "text", text: `Error uploading file: ${e.message}` }] };
     }
   }
 );
@@ -396,10 +330,7 @@ server.tool(
   "take_screenshot",
   "Captures a screenshot of the current page",
   {
-    outputPath: z
-      .string()
-      .optional()
-      .describe("Optional path where to save the screenshot. If not provided, returns base64 data."),
+    outputPath: z.string().optional().describe("Optional path where to save the screenshot. If not provided, returns base64 data."),
   },
   async ({ outputPath }) => {
     try {
@@ -408,9 +339,7 @@ server.tool(
       if (outputPath) {
         const fs = await import("fs");
         await fs.promises.writeFile(outputPath, screenshot, "base64");
-        return {
-          content: [{ type: "text", text: `Screenshot saved to ${outputPath}` }],
-        };
+        return { content: [{ type: "text", text: `Screenshot saved to ${outputPath}` }] };
       } else {
         return {
           content: [
@@ -420,9 +349,7 @@ server.tool(
         };
       }
     } catch (e) {
-      return {
-        content: [{ type: "text", text: `Error taking screenshot: ${e.message}` }],
-      };
+      return { content: [{ type: "text", text: `Error taking screenshot: ${e.message}` }] };
     }
   }
 );
