@@ -3,8 +3,15 @@ import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import pkg from "selenium-webdriver";
-const { By, until } = pkg;  // Importation ajoutée pour utiliser By et until
-import { PassThrough } from "stream";
+const { By, until } = pkg;  // Importation pour utiliser By et until
+import { Readable } from "stream";
+
+// Création d'un flux d'entrée "dummy" qui implémente .on
+const dummyStdin = new Readable({
+  read() {
+    // Pas de données à lire
+  }
+});
 
 // --- Utiliser une classe personnalisée pour forcer l'initialisation de "tools" ---
 class McpServerFixed extends McpServer {
@@ -431,12 +438,9 @@ process.on("SIGTERM", cleanup);
 process.on("SIGINT", cleanup);
 
 // --- Démarrage du serveur via le transport Stdio ---
-// Création d'un flux stdin adapté via PassThrough
-const stdinStream = new PassThrough();
-process.stdin.pipe(stdinStream);
-
+// Passage du flux d'entrée "dummy" et de process.stdout au transport, avec un délai de connexion
 const transport = new StdioServerTransport({
-  stdin: stdinStream,
+  stdin: dummyStdin,
   stdout: process.stdout,
   connectionTimeout: 30000
 });
