@@ -3,7 +3,7 @@ import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import pkg from "selenium-webdriver";
-
+const { By, until } = pkg;  // Importation ajoutée pour utiliser By et until
 
 // --- Utiliser une classe personnalisée pour forcer l'initialisation de "tools" ---
 class McpServerFixed extends McpServer {
@@ -166,7 +166,6 @@ server.tool(
     }
   }
 );
-
 
 server.tool(
   "navigate",
