@@ -3,7 +3,7 @@ import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import pkg from "selenium-webdriver";
-const { By, until } = pkg;  // Importation ajoutée pour utiliser By et until
+const { By, until } = pkg; // Importation ajoutée pour utiliser By et until
 
 // --- Utiliser une classe personnalisée pour forcer l'initialisation de "tools" ---
 class McpServerFixed extends McpServer {
@@ -430,5 +430,12 @@ process.on("SIGTERM", cleanup);
 process.on("SIGINT", cleanup);
 
 // --- Démarrage du serveur via le transport Stdio ---
-const transport = new StdioServerTransport();
-await server.connect(transport);
+// Ici, on essaie de configurer un délai de connexion plus long (par exemple, 30 secondes)
+const transportOptions = { connectionTimeout: 30000 };
+const transport = new StdioServerTransport(transportOptions);
+try {
+  await server.connect(transport);
+} catch (error) {
+  console.error("Failed to connect to MCP server:", error);
+  process.exit(1);
+}
