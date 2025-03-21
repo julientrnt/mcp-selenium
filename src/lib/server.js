@@ -82,29 +82,26 @@ import { Builder } from "selenium-webdriver";
 import { Options as ChromeOptions, ServiceBuilder } from "selenium-webdriver/chrome.js";
 import { Options as FirefoxOptions } from "selenium-webdriver/firefox.js";
 
-// Fonction utilitaire pour trouver le chemin du chromedriver
+// Fonction pour trouver chromedriver
 function findChromeDriverPath() {
   const possiblePaths = [
     process.env.CHROMEDRIVER_BIN,
     '/usr/bin/chromedriver',
     '/usr/lib/chromium/chromedriver',
-    '/usr/bin/chromium-chromedriver',
-    '/usr/local/bin/chromedriver',
-    '/opt/chromium/chromedriver'
+    '/usr/bin/chromium-chromedriver'
   ].filter(Boolean);
-
   for (const path of possiblePaths) {
     try {
       fs.accessSync(path, fs.constants.X_OK);
       return path;
     } catch (err) {
-      // On passe au suivant si ce chemin n'est pas exécutable
+      // chemin non accessible, continuer
     }
   }
-  throw new Error("Chromedriver executable not found in any known path. Veuillez vérifier son installation.");
+  throw new Error("Chromedriver executable not found in any known path. Vérifiez son installation.");
 }
 
-// S'assurer que le répertoire temporaire existe et est accessible
+// Créer le répertoire temporaire pour le profil utilisateur si nécessaire
 const chromeDataDir = '/tmp/chrome-data';
 if (!fs.existsSync(chromeDataDir)) {
   fs.mkdirSync(chromeDataDir, { recursive: true });
@@ -124,28 +121,20 @@ server.tool(
       if (browser === "chrome") {
         const chromeOptions = new ChromeOptions();
 
-        // Forcer le binaire : utiliser CHROME_BIN ou, par défaut, /usr/bin/chromium
+        // Forcer le chemin du binaire : utiliser CHROME_BIN ou /usr/bin/chromium
         chromeOptions.setChromeBinaryPath(process.env.CHROME_BIN || '/usr/bin/chromium');
 
-        // Ajouter les flags indispensables pour headless en tant que root
+        // Ajouter les flags indispensables pour un fonctionnement headless en tant que root
         chromeOptions.addArguments(
+          "--headless",
           "--no-sandbox",
           "--disable-dev-shm-usage",
-          "--disable-setuid-sandbox",
           "--disable-gpu",
-          "--no-first-run",
-          "--no-zygote",
-          "--disable-software-rasterizer",
           `--user-data-dir=${chromeDataDir}`
         );
-        if (options.headless) {
-          // Utiliser l'option headless classique
-          chromeOptions.addArguments("--headless");
-        }
         if (options.arguments) {
           options.arguments.forEach(arg => chromeOptions.addArguments(arg));
         }
-
         const chromeDriverPath = findChromeDriverPath();
         const chromeService = new ServiceBuilder(chromeDriverPath);
 
@@ -164,11 +153,9 @@ server.tool(
         }
         driver = await builder.forBrowser("firefox").setFirefoxOptions(firefoxOptions).build();
       }
-
       const sessionId = `${browser}_${Date.now()}`;
       state.drivers.set(sessionId, driver);
       state.currentSession = sessionId;
-
       return {
         content: [{ type: "text", text: `Browser started with session_id: ${sessionId}` }],
       };
