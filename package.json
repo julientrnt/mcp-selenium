@@ -8,6 +8,7 @@
     "mcp-selenium": "./src/lib/server.js"
   },
   "scripts": {
+    "postinstall": "sh install-system-deps.sh",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -21,4 +22,3 @@
     "@modelcontextprotocol/inspector": "^0.4.1"
   }
 }
-
