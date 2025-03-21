@@ -106,6 +106,10 @@ server.tool(
   },
   async ({ browser, options = {} }) => {
     try {
+      // Si options est un tableau, on le convertit en objet avec la clé "arguments"
+      if (Array.isArray(options)) {
+        options = { arguments: options };
+      }
       let builder = new Builder();
       let driver;
       if (browser === "chrome") {
