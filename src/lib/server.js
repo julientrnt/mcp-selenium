@@ -92,8 +92,20 @@ server.tool(
       let driver;
       if (browser === "chrome") {
         const chromeOptions = new ChromeOptions();
-        // Ajout des options indispensables dans un conteneur
-        chromeOptions.addArguments("--no-sandbox", "--disable-dev-shm-usage");
+
+        // Si la variable d'environnement CHROME_BIN est définie, on l'utilise pour pointer vers le binaire
+        if (process.env.CHROME_BIN) {
+          chromeOptions.setChromeBinaryPath(process.env.CHROME_BIN);
+        }
+
+        // Ajout d'un ensemble d'arguments pour contourner les problèmes de sandbox dans un conteneur
+        chromeOptions.addArguments(
+          "--no-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-gpu",
+          "--disable-setuid-sandbox"
+        );
+
         if (options.headless) {
           chromeOptions.addArguments("--headless=new");
         }
@@ -126,6 +138,7 @@ server.tool(
     }
   }
 );
+
 
 server.tool(
   "navigate",
