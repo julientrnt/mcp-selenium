@@ -1,3 +1,6 @@
+// Redirige tous les logs vers stderr pour ne pas polluer stdout (réservé au protocole MCP)
+console.log = (...args) => process.stderr.write(args.join(' ') + '\n');
+
 // Empêche le processus de se terminer en laissant stdin ouvert
 process.stdin.setEncoding('utf8');
 process.stdin.resume();
@@ -80,7 +83,6 @@ server.tool(
                 if (options.arguments) {
                     options.arguments.forEach(arg => chromeOptions.addArguments(arg));
                 }
-
                 driver = await builder
                     .forBrowser('chrome')
                     .setChromeOptions(chromeOptions)
@@ -93,7 +95,6 @@ server.tool(
                 if (options.arguments) {
                     options.arguments.forEach(arg => firefoxOptions.addArguments(arg));
                 }
-
                 driver = await builder
                     .forBrowser('firefox')
                     .setFirefoxOptions(firefoxOptions)
@@ -126,13 +127,9 @@ server.tool(
         try {
             const driver = getDriver();
             await driver.get(url);
-            return {
-                content: [{ type: 'text', text: `Navigated to ${url}` }]
-            };
+            return { content: [{ type: 'text', text: `Navigated to ${url}` }] };
         } catch (e) {
-            return {
-                content: [{ type: 'text', text: `Error navigating: ${e.message}` }]
-            };
+            return { content: [{ type: 'text', text: `Error navigating: ${e.message}` }] };
         }
     }
 );
@@ -149,13 +146,9 @@ server.tool(
             const driver = getDriver();
             const locator = getLocator(by, value);
             await driver.wait(until.elementLocated(locator), timeout);
-            return {
-                content: [{ type: 'text', text: 'Element found' }]
-            };
+            return { content: [{ type: 'text', text: 'Element found' }] };
         } catch (e) {
-            return {
-                content: [{ type: 'text', text: `Error finding element: ${e.message}` }]
-            };
+            return { content: [{ type: 'text', text: `Error finding element: ${e.message}` }] };
         }
     }
 );
@@ -173,18 +166,14 @@ server.tool(
             const locator = getLocator(by, value);
             const element = await driver.wait(until.elementLocated(locator), timeout);
             await element.click();
-            return {
-                content: [{ type: 'text', text: 'Element clicked' }]
-            };
+            return { content: [{ type: 'text', text: 'Element clicked' }] };
         } catch (e) {
-            return {
-                content: [{ type: 'text', text: `Error clicking element: ${e.message}` }]
-            };
+            return { content: [{ type: 'text', text: `Error clicking element: ${e.message}` }] };
         }
     }
 );
 
-// Outil pour envoyer des touches à un élément (saisie)
+// Outil pour envoyer des touches (saisie) à un élément
 server.tool(
     "send_keys",
     "sends keys to an element, aka typing",
@@ -199,13 +188,9 @@ server.tool(
             const element = await driver.wait(until.elementLocated(locator), timeout);
             await element.clear();
             await element.sendKeys(text);
-            return {
-                content: [{ type: 'text', text: `Text "${text}" entered into element` }]
-            };
+            return { content: [{ type: 'text', text: `Text "${text}" entered into element` }] };
         } catch (e) {
-            return {
-                content: [{ type: 'text', text: `Error entering text: ${e.message}` }]
-            };
+            return { content: [{ type: 'text', text: `Error entering text: ${e.message}` }] };
         }
     }
 );
@@ -223,13 +208,9 @@ server.tool(
             const locator = getLocator(by, value);
             const element = await driver.wait(until.elementLocated(locator), timeout);
             const text = await element.getText();
-            return {
-                content: [{ type: 'text', text }]
-            };
+            return { content: [{ type: 'text', text }] };
         } catch (e) {
-            return {
-                content: [{ type: 'text', text: `Error getting element text: ${e.message}` }]
-            };
+            return { content: [{ type: 'text', text: `Error getting element text: ${e.message}` }] };
         }
     }
 );
@@ -248,13 +229,9 @@ server.tool(
             const element = await driver.wait(until.elementLocated(locator), timeout);
             const actions = driver.actions({ bridge: true });
             await actions.move({ origin: element }).perform();
-            return {
-                content: [{ type: 'text', text: 'Hovered over element' }]
-            };
+            return { content: [{ type: 'text', text: 'Hovered over element' }] };
         } catch (e) {
-            return {
-                content: [{ type: 'text', text: `Error hovering over element: ${e.message}` }]
-            };
+            return { content: [{ type: 'text', text: `Error hovering over element: ${e.message}` }] };
         }
     }
 );
@@ -265,28 +242,21 @@ server.tool(
     "drags an element and drops it onto another element",
     {
         ...locatorSchema,
-        targetBy: z.enum(["id", "css", "xpath", "name", "tag", "class"]).describe("Locator strategy to find target element"),
-        targetValue: z.string().describe("Value for the target locator strategy")
+        targetBy: z.enum(["id", "css", "xpath", "name", "tag", "class"]).describe("Locator strategy for target element"),
+        targetValue: z.string().describe("Value for the target locator")
     },
     async ({ by, value, targetBy, targetValue, timeout = 10000 }) => {
         try {
             const driver = getDriver();
             const sourceLocator = getLocator(by, value);
             const targetLocator = getLocator(targetBy, targetValue);
-
             const sourceElement = await driver.wait(until.elementLocated(sourceLocator), timeout);
             const targetElement = await driver.wait(until.elementLocated(targetLocator), timeout);
-
             const actions = driver.actions({ bridge: true });
             await actions.dragAndDrop(sourceElement, targetElement).perform();
-
-            return {
-                content: [{ type: 'text', text: 'Drag and drop completed' }]
-            };
+            return { content: [{ type: 'text', text: 'Drag and drop completed' }] };
         } catch (e) {
-            return {
-                content: [{ type: 'text', text: `Error performing drag and drop: ${e.message}` }]
-            };
+            return { content: [{ type: 'text', text: `Error performing drag and drop: ${e.message}` }] };
         }
     }
 );
@@ -305,13 +275,9 @@ server.tool(
             const element = await driver.wait(until.elementLocated(locator), timeout);
             const actions = driver.actions({ bridge: true });
             await actions.doubleClick(element).perform();
-            return {
-                content: [{ type: 'text', text: 'Double click performed' }]
-            };
+            return { content: [{ type: 'text', text: 'Double click performed' }] };
         } catch (e) {
-            return {
-                content: [{ type: 'text', text: `Error performing double click: ${e.message}` }]
-            };
+            return { content: [{ type: 'text', text: `Error performing double click: ${e.message}` }] };
         }
     }
 );
@@ -330,13 +296,9 @@ server.tool(
             const element = await driver.wait(until.elementLocated(locator), timeout);
             const actions = driver.actions({ bridge: true });
             await actions.contextClick(element).perform();
-            return {
-                content: [{ type: 'text', text: 'Right click performed' }]
-            };
+            return { content: [{ type: 'text', text: 'Right click performed' }] };
         } catch (e) {
-            return {
-                content: [{ type: 'text', text: `Error performing right click: ${e.message}` }]
-            };
+            return { content: [{ type: 'text', text: `Error performing right click: ${e.message}` }] };
         }
     }
 );
@@ -353,13 +315,9 @@ server.tool(
             const driver = getDriver();
             const actions = driver.actions({ bridge: true });
             await actions.keyDown(key).keyUp(key).perform();
-            return {
-                content: [{ type: 'text', text: `Key '${key}' pressed` }]
-            };
+            return { content: [{ type: 'text', text: `Key '${key}' pressed` }] };
         } catch (e) {
-            return {
-                content: [{ type: 'text', text: `Error pressing key: ${e.message}` }]
-            };
+            return { content: [{ type: 'text', text: `Error pressing key: ${e.message}` }] };
         }
     }
 );
@@ -378,13 +336,9 @@ server.tool(
             const locator = getLocator(by, value);
             const element = await driver.wait(until.elementLocated(locator), timeout);
             await element.sendKeys(filePath);
-            return {
-                content: [{ type: 'text', text: 'File upload initiated' }]
-            };
+            return { content: [{ type: 'text', text: 'File upload initiated' }] };
         } catch (e) {
-            return {
-                content: [{ type: 'text', text: `Error uploading file: ${e.message}` }]
-            };
+            return { content: [{ type: 'text', text: `Error uploading file: ${e.message}` }] };
         }
     }
 );
@@ -400,13 +354,10 @@ server.tool(
         try {
             const driver = getDriver();
             const screenshot = await driver.takeScreenshot();
-
             if (outputPath) {
                 const fs = await import('fs');
                 await fs.promises.writeFile(outputPath, screenshot, 'base64');
-                return {
-                    content: [{ type: 'text', text: `Screenshot saved to ${outputPath}` }]
-                };
+                return { content: [{ type: 'text', text: `Screenshot saved to ${outputPath}` }] };
             } else {
                 return {
                     content: [
@@ -416,14 +367,12 @@ server.tool(
                 };
             }
         } catch (e) {
-            return {
-                content: [{ type: 'text', text: `Error taking screenshot: ${e.message}` }]
-            };
+            return { content: [{ type: 'text', text: `Error taking screenshot: ${e.message}` }] };
         }
     }
 );
 
-// Ressource pour connaître l'état du navigateur
+// Ressource pour afficher l'état du navigateur
 server.resource(
     "browser-status",
     new ResourceTemplate("browser-status://current"),
@@ -437,7 +386,7 @@ server.resource(
     })
 );
 
-// Handler de nettoyage pour fermer proprement toutes les sessions de navigateur
+// Fonction de nettoyage pour fermer toutes les sessions de navigateur proprement
 async function cleanup() {
     for (const [sessionId, driver] of state.drivers) {
         try {
