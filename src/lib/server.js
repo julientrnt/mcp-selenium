@@ -3,17 +3,14 @@ import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import pkg from "selenium-webdriver";
-const { By, until } = pkg;  // Importation pour utiliser By et until
-import { PassThrough } from "stream";
+const { By, until } = pkg;  // Pour utiliser By et until
 
-// Créez un flux stdin correct en utilisant un PassThrough et en y pipeant process.stdin
-const fixedStdin = new PassThrough();
-if (process.stdin && typeof process.stdin.on === "function") {
-  process.stdin.pipe(fixedStdin);
-} else {
-  // Si process.stdin n'est pas utilisable, fixedStdin restera un flux vide.
-  fixedStdin._read = () => {};
-}
+// Création d'un objet dummy pour stdin
+const fakeStdin = {
+  on: (event, handler) => {
+    // Ne fait rien, ou vous pouvez logger si besoin
+  }
+};
 
 // --- Utiliser une classe personnalisée pour forcer l'initialisation de "tools" ---
 class McpServerFixed extends McpServer {
@@ -51,18 +48,12 @@ const getDriver = () => {
 
 const getLocator = (by, value) => {
   switch (by.toLowerCase()) {
-    case "id":
-      return By.id(value);
-    case "css":
-      return By.css(value);
-    case "xpath":
-      return By.xpath(value);
-    case "name":
-      return By.name(value);
-    case "tag":
-      return By.tagName(value);
-    case "class":
-      return By.className(value);
+    case "id":    return By.id(value);
+    case "css":   return By.css(value);
+    case "xpath": return By.xpath(value);
+    case "name":  return By.name(value);
+    case "tag":   return By.tagName(value);
+    case "class": return By.className(value);
     default:
       throw new Error(`Unsupported locator strategy: ${by}`);
   }
@@ -430,7 +421,7 @@ process.on("SIGINT", cleanup);
 
 // --- Démarrage du serveur via le transport Stdio ---
 const transport = new StdioServerTransport({
-  stdin: fixedStdin,
+  stdin: fakeStdin,
   stdout: process.stdout,
   connectionTimeout: 30000
 });
