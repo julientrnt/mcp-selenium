@@ -1,6 +1,6 @@
 FROM node:18-alpine
 
-# Install Chrome and dependencies
+# Installation de Chrome et dépendances
 RUN apk update && apk add --no-cache \
     chromium \
     chromium-chromedriver \
@@ -14,21 +14,21 @@ RUN apk update && apk add --no-cache \
     ttf-opensans \
     chromium-chromedriver
 
-# Set Chrome environment variables
+# Variables d'environnement pour Chrome
 ENV CHROME_BIN=/usr/bin/chromium-browser
 ENV CHROME_PATH=/usr/lib/chromium/
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 WORKDIR /app
 
-# Copy package files
+# Copier les fichiers package
 COPY package*.json ./
 
-# Install dependencies
+# Installer les dépendances
 RUN npm install
 
-# Copy application code
+# Copier le code de l'application
 COPY . .
 
-# Start the MCP server
-CMD ["node", "src/lib/server.js"]
+# Lancer le serveur via le script de lancement qui gère stdio
+CMD ["node", "bin/mcp-selenium.js"]

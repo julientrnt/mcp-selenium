@@ -1,3 +1,4 @@
+// Empêche le processus de se terminer en laissant stdin ouvert
 process.stdin.setEncoding('utf8');
 process.stdin.resume();
 
@@ -9,19 +10,19 @@ const { Builder, By, Key, until, Actions } = pkg;
 import { Options as ChromeOptions } from 'selenium-webdriver/chrome.js';
 import { Options as FirefoxOptions } from 'selenium-webdriver/firefox.js';
 
-// Create an MCP server
+// Création du serveur MCP
 const server = new McpServer({
     name: "MCP Selenium",
     version: "1.0.0"
 });
 
-// Server state
+// État interne pour gérer les sessions de navigateur
 const state = {
     drivers: new Map(),
     currentSession: null
 };
 
-// Helper functions
+// Fonction utilitaire pour récupérer le driver actif
 const getDriver = () => {
     const driver = state.drivers.get(state.currentSession);
     if (!driver) {
@@ -30,6 +31,7 @@ const getDriver = () => {
     return driver;
 };
 
+// Fonction pour construire un localisateur en fonction de la stratégie
 const getLocator = (by, value) => {
     switch (by.toLowerCase()) {
         case 'id': return By.id(value);
@@ -42,19 +44,22 @@ const getLocator = (by, value) => {
     }
 };
 
-// Common schemas
+// Schéma de validation pour les options du navigateur
 const browserOptionsSchema = z.object({
     headless: z.boolean().optional().describe("Run browser in headless mode"),
     arguments: z.array(z.string()).optional().describe("Additional browser arguments")
 }).optional();
 
+// Schéma pour définir un localisateur d'élément
 const locatorSchema = {
     by: z.enum(["id", "css", "xpath", "name", "tag", "class"]).describe("Locator strategy to find element"),
     value: z.string().describe("Value for the locator strategy"),
     timeout: z.number().optional().describe("Maximum time to wait for element in milliseconds")
 };
 
-// Browser Management Tools
+// --- Outils MCP ---
+
+// Outil pour démarrer un navigateur
 server.tool(
     "start_browser",
     "launches browser",
@@ -110,12 +115,12 @@ server.tool(
     }
 );
 
+// Outil pour naviguer vers une URL
 server.tool(
     "navigate",
     "navigates to a URL",
     {
         url: z.string().describe("URL to navigate to")
-
     },
     async ({ url }) => {
         try {
@@ -132,7 +137,7 @@ server.tool(
     }
 );
 
-// Element Interaction Tools
+// Outil pour trouver un élément
 server.tool(
     "find_element",
     "finds an element",
@@ -155,6 +160,7 @@ server.tool(
     }
 );
 
+// Outil pour cliquer sur un élément
 server.tool(
     "click_element",
     "clicks an element",
@@ -178,6 +184,7 @@ server.tool(
     }
 );
 
+// Outil pour envoyer des touches à un élément (saisie)
 server.tool(
     "send_keys",
     "sends keys to an element, aka typing",
@@ -203,6 +210,7 @@ server.tool(
     }
 );
 
+// Outil pour récupérer le texte d'un élément
 server.tool(
     "get_element_text",
     "gets the text() of an element",
@@ -226,6 +234,7 @@ server.tool(
     }
 );
 
+// Outil pour survoler un élément avec la souris
 server.tool(
     "hover",
     "moves the mouse to hover over an element",
@@ -250,6 +259,7 @@ server.tool(
     }
 );
 
+// Outil pour effectuer un drag and drop
 server.tool(
     "drag_and_drop",
     "drags an element and drops it onto another element",
@@ -281,6 +291,7 @@ server.tool(
     }
 );
 
+// Outil pour effectuer un double-clic
 server.tool(
     "double_click",
     "performs a double click on an element",
@@ -305,6 +316,7 @@ server.tool(
     }
 );
 
+// Outil pour effectuer un clic droit (context click)
 server.tool(
     "right_click",
     "performs a right click (context click) on an element",
@@ -329,6 +341,7 @@ server.tool(
     }
 );
 
+// Outil pour simuler l'appui sur une touche du clavier
 server.tool(
     "press_key",
     "simulates pressing a keyboard key",
@@ -351,6 +364,7 @@ server.tool(
     }
 );
 
+// Outil pour uploader un fichier via un input type="file"
 server.tool(
     "upload_file",
     "uploads a file using a file input element",
@@ -375,6 +389,7 @@ server.tool(
     }
 );
 
+// Outil pour prendre une capture d'écran
 server.tool(
     "take_screenshot",
     "captures a screenshot of the current page",
@@ -408,7 +423,7 @@ server.tool(
     }
 );
 
-// Resources
+// Ressource pour connaître l'état du navigateur
 server.resource(
     "browser-status",
     new ResourceTemplate("browser-status://current"),
@@ -422,7 +437,7 @@ server.resource(
     })
 );
 
-// Cleanup handler
+// Handler de nettoyage pour fermer proprement toutes les sessions de navigateur
 async function cleanup() {
     for (const [sessionId, driver] of state.drivers) {
         try {
@@ -439,6 +454,6 @@ async function cleanup() {
 process.on('SIGTERM', cleanup);
 process.on('SIGINT', cleanup);
 
-// Start the server
+// Connexion du serveur MCP en utilisant le transport stdio
 const transport = new StdioServerTransport();
 await server.connect(transport);
