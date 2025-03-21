@@ -79,6 +79,10 @@ const locatorSchema = {
 };
 
 // --- Outils de gestion du navigateur ---
+import { Builder, By, until } from "selenium-webdriver";
+import { Options as ChromeOptions, ServiceBuilder } from "selenium-webdriver/chrome.js";
+import { Options as FirefoxOptions } from "selenium-webdriver/firefox.js";
+
 server.tool(
   "start_browser",
   "Launches a browser session",
@@ -93,26 +97,36 @@ server.tool(
       if (browser === "chrome") {
         const chromeOptions = new ChromeOptions();
 
-        // Si la variable d'environnement CHROME_BIN est définie, on l'utilise pour pointer vers le binaire
+        // Spécifiez explicitement le chemin du binaire Chrome si défini dans l'environnement
         if (process.env.CHROME_BIN) {
           chromeOptions.setChromeBinaryPath(process.env.CHROME_BIN);
         }
 
-        // Ajout d'un ensemble d'arguments pour contourner les problèmes de sandbox dans un conteneur
+        // Ajout d'un ensemble d'arguments pour contourner les restrictions dans Docker
         chromeOptions.addArguments(
           "--no-sandbox",
           "--disable-dev-shm-usage",
+          "--disable-setuid-sandbox",
           "--disable-gpu",
-          "--disable-setuid-sandbox"
+          "--remote-debugging-port=9222"
         );
 
         if (options.headless) {
+          // Vous pouvez essayer "--headless" si "--headless=new" pose problème
           chromeOptions.addArguments("--headless=new");
         }
         if (options.arguments) {
           options.arguments.forEach((arg) => chromeOptions.addArguments(arg));
         }
-        driver = await builder.forBrowser("chrome").setChromeOptions(chromeOptions).build();
+
+        // Spécifiez explicitement le chromedriver installé (sur Alpine, normalement à /usr/bin/chromedriver)
+        const chromeService = new ServiceBuilder(process.env.CHROMEDRIVER_BIN || '/usr/bin/chromedriver').build();
+
+        driver = await builder
+          .forBrowser("chrome")
+          .setChromeOptions(chromeOptions)
+          .setChromeService(chromeService)
+          .build();
       } else {
         const firefoxOptions = new FirefoxOptions();
         if (options.headless) {
