@@ -3,7 +3,9 @@ import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import pkg from "selenium-webdriver";
-
+const { Builder, By, Key, until, Actions } = pkg;
+import { Options as ChromeOptions } from "selenium-webdriver/chrome.js";
+import { Options as FirefoxOptions } from "selenium-webdriver/firefox.js";
 
 // --- Utiliser une classe personnalisée pour forcer l'initialisation de "tools" ---
 class McpServerFixed extends McpServer {
@@ -77,9 +79,29 @@ const locatorSchema = {
 };
 
 // --- Outils de gestion du navigateur ---
+import fs from 'fs';
 import { Builder } from "selenium-webdriver";
 import { Options as ChromeOptions, ServiceBuilder } from "selenium-webdriver/chrome.js";
 import { Options as FirefoxOptions } from "selenium-webdriver/firefox.js";
+
+// Fonction utilitaire pour trouver le chemin de chromedriver
+function findChromeDriverPath() {
+  const possiblePaths = [
+    process.env.CHROMEDRIVER_BIN,          // Utilise la variable d'environnement si définie
+    '/usr/lib/chromium/chromedriver',
+    '/usr/bin/chromedriver'
+  ].filter(Boolean);
+
+  for (const path of possiblePaths) {
+    try {
+      fs.accessSync(path, fs.constants.X_OK);
+      return path;
+    } catch (e) {
+      // chemin inaccessible, on passe au suivant
+    }
+  }
+  throw new Error("Chromedriver executable not found in any known path");
+}
 
 server.tool(
   "start_browser",
@@ -95,7 +117,7 @@ server.tool(
       if (browser === "chrome") {
         const chromeOptions = new ChromeOptions();
 
-        // Spécifier explicitement le chemin du binaire Chrome si défini
+        // Définition explicite du binaire Chrome si CHROME_BIN est défini
         if (process.env.CHROME_BIN) {
           chromeOptions.setChromeBinaryPath(process.env.CHROME_BIN);
         }
@@ -109,14 +131,14 @@ server.tool(
           "--remote-debugging-port=9222"
         );
         if (options.headless) {
-          chromeOptions.addArguments("--headless=new");
+          chromeOptions.addArguments("--headless");
         }
         if (options.arguments) {
           options.arguments.forEach((arg) => chromeOptions.addArguments(arg));
         }
 
-        // Utilisation de la variable d'environnement ou du chemin par défaut adapté à Alpine
-        const chromeDriverPath = process.env.CHROMEDRIVER_BIN || '/usr/bin/chromedriver';
+        // Recherche du chemin de chromedriver
+        const chromeDriverPath = findChromeDriverPath();
         const chromeService = new ServiceBuilder(chromeDriverPath);
 
         driver = await builder
