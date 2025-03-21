@@ -3,9 +3,7 @@ import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import pkg from "selenium-webdriver";
-import { Builder } from "selenium-webdriver";
-import { Options as ChromeOptions, ServiceBuilder } from "selenium-webdriver/chrome.js";
-import { Options as FirefoxOptions } from "selenium-webdriver/firefox.js";
+
 
 // --- Utiliser une classe personnalisée pour forcer l'initialisation de "tools" ---
 class McpServerFixed extends McpServer {
@@ -79,7 +77,9 @@ const locatorSchema = {
 };
 
 // --- Outils de gestion du navigateur ---
-
+import { Builder } from "selenium-webdriver";
+import { Options as ChromeOptions, ServiceBuilder } from "selenium-webdriver/chrome.js";
+import { Options as FirefoxOptions } from "selenium-webdriver/firefox.js";
 
 server.tool(
   "start_browser",
@@ -95,12 +95,12 @@ server.tool(
       if (browser === "chrome") {
         const chromeOptions = new ChromeOptions();
 
-        // Si CHROME_BIN est défini, le définir explicitement
+        // Spécifie le binaire de Chrome si défini
         if (process.env.CHROME_BIN) {
           chromeOptions.setChromeBinaryPath(process.env.CHROME_BIN);
         }
 
-        // Ajout d'arguments pour exécuter Chrome dans un conteneur
+        // Ajoute les arguments nécessaires pour tourner dans un conteneur
         chromeOptions.addArguments(
           "--no-sandbox",
           "--disable-dev-shm-usage",
@@ -108,7 +108,6 @@ server.tool(
           "--disable-gpu",
           "--remote-debugging-port=9222"
         );
-
         if (options.headless) {
           chromeOptions.addArguments("--headless=new");
         }
@@ -116,9 +115,10 @@ server.tool(
           options.arguments.forEach((arg) => chromeOptions.addArguments(arg));
         }
 
-        // Créez un ServiceBuilder sans appeler .build()
-        const chromeService = new ServiceBuilder(process.env.CHROMEDRIVER_BIN || '/usr/bin/chromedriver');
+        // Utilise la variable d'environnement ou un chemin par défaut adapté à Alpine
+        const chromeDriverPath = process.env.CHROMEDRIVER_BIN || '/usr/bin/chromium-chromedriver';
 
+        const chromeService = new ServiceBuilder(chromeDriverPath);
         driver = await builder
           .forBrowser("chrome")
           .setChromeOptions(chromeOptions)
