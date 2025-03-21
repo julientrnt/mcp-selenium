@@ -9,35 +9,21 @@ const __dirname = dirname(__filename);
 
 const serverPath = resolve(__dirname, '../src/lib/server.js');
 
-// Start the server
+// Lancer le serveur MCP avec stdio en mode pipe
 const child = spawn('node', [serverPath], {
     stdio: ['pipe', 'pipe', 'pipe']
 });
 
+// Afficher les sorties du serveur pour le debug
 child.stdout.on('data', (data) => {
-    console.log(`MCP Server stdout: ${data}`);
+    console.log(`[MCP Server stdout]: ${data}`);
 });
 child.stderr.on('data', (data) => {
-    console.error(`MCP Server stderr: ${data}`);
+    console.error(`[MCP Server stderr]: ${data}`);
 });
-child.on('exit', (code, signal) => {
-    console.log(`MCP Server exited with code ${code} and signal ${signal}`);
+child.on('close', (code) => {
+    console.log(`[MCP Server] exited with code ${code}`);
 });
-child.on('error', (error) => {
-    console.error(`Error starting server: ${error.message}`);
-    process.exit(1);
-});
-
-child.on('error', (error) => {
-    console.error(`Error starting server: ${error.message}`);
-    process.exit(1);
-});
-
-// Handle process termination
-process.on('SIGTERM', () => {
-    child.kill('SIGTERM');
-});
-
-process.on('SIGINT', () => {
-    child.kill('SIGINT');
+child.on('error', (err) => {
+    console.error(`[MCP Server] error: ${err}`);
 });
