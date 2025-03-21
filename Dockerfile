@@ -29,7 +29,6 @@ RUN npm install
 
 # Copier le code de l'application
 COPY . .
-ENV CHROMEDRIVER_BIN=/usr/bin/chromedriver
 
 # Lancer le serveur via le script de lancement qui gère stdio
 CMD ["node", "bin/mcp-selenium.js"]
