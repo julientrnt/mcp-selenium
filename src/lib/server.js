@@ -2,19 +2,20 @@
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import pkg from "selenium-webdriver";
-
+import fs from 'fs';
+import path from 'path';
+import { Builder, By, until } from "selenium-webdriver";
+import { Options as ChromeOptions, ServiceBuilder } from "selenium-webdriver/chrome.js";
+import { Options as FirefoxOptions } from "selenium-webdriver/firefox.js";
 
 // --- Utiliser une classe personnalisée pour forcer l'initialisation de "tools" ---
 class McpServerFixed extends McpServer {
   constructor(options) {
     super(options);
-    // Si "tools" ou "tools.list" n'est pas défini, l'initialiser
     if (!this.tools || !this.tools.list) {
       this.tools = { list: [] };
     }
   }
-  // Surcharge de la méthode tool pour enregistrer les métadonnées dans tools.list
   tool(name, description, schema, handler) {
     this.tools.list.push({ name, description, schema });
     return super.tool(name, description, schema, handler);
@@ -76,13 +77,7 @@ const locatorSchema = {
   timeout: z.number().optional().describe("Maximum time to wait for element in milliseconds"),
 };
 
-// --- Outils de gestion du navigateur ---
-import fs from 'fs';
-import { Builder } from "selenium-webdriver";
-import { Options as ChromeOptions, ServiceBuilder } from "selenium-webdriver/chrome.js";
-import { Options as FirefoxOptions } from "selenium-webdriver/firefox.js";
-
-// Fonction pour trouver chromedriver
+// --- Fonction pour trouver chromedriver ---
 function findChromeDriverPath() {
   const possiblePaths = [
     process.env.CHROMEDRIVER_BIN,
@@ -90,10 +85,10 @@ function findChromeDriverPath() {
     '/usr/lib/chromium/chromedriver',
     '/usr/bin/chromium-chromedriver'
   ].filter(Boolean);
-  for (const path of possiblePaths) {
+  for (const pathCandidate of possiblePaths) {
     try {
-      fs.accessSync(path, fs.constants.X_OK);
-      return path;
+      fs.accessSync(pathCandidate, fs.constants.X_OK);
+      return pathCandidate;
     } catch (err) {
       // chemin non accessible, continuer
     }
@@ -101,12 +96,7 @@ function findChromeDriverPath() {
   throw new Error("Chromedriver executable not found in any known path. Vérifiez son installation.");
 }
 
-// Créer le répertoire temporaire pour le profil utilisateur si nécessaire
-const chromeDataDir = '/tmp/chrome-data';
-if (!fs.existsSync(chromeDataDir)) {
-  fs.mkdirSync(chromeDataDir, { recursive: true });
-}
-
+// --- Outil pour lancer le navigateur ---
 server.tool(
   "start_browser",
   "Launches a browser session",
@@ -124,13 +114,16 @@ server.tool(
         // Forcer le chemin du binaire : utiliser CHROME_BIN ou /usr/bin/chromium
         chromeOptions.setChromeBinaryPath(process.env.CHROME_BIN || '/usr/bin/chromium');
 
+        // Créer un répertoire de données utilisateur unique pour cette session
+        const uniqueChromeDataDir = fs.mkdtempSync(path.join('/tmp', 'chrome-data-'));
+
         // Ajouter les flags indispensables pour un fonctionnement headless en tant que root
         chromeOptions.addArguments(
           "--headless",
           "--no-sandbox",
           "--disable-dev-shm-usage",
           "--disable-gpu",
-          `--user-data-dir=${chromeDataDir}`
+          `--user-data-dir=${uniqueChromeDataDir}`
         );
         if (options.arguments) {
           options.arguments.forEach(arg => chromeOptions.addArguments(arg));
@@ -167,7 +160,7 @@ server.tool(
   }
 );
 
-
+// --- Outil pour naviguer vers une URL ---
 server.tool(
   "navigate",
   "Navigates to a URL",
@@ -189,7 +182,7 @@ server.tool(
   }
 );
 
-// --- Outils d'interaction avec les éléments ---
+// --- Outil pour trouver un élément ---
 server.tool(
   "find_element",
   "Finds an element",
@@ -206,6 +199,7 @@ server.tool(
   }
 );
 
+// --- Outil pour cliquer sur un élément ---
 server.tool(
   "click_element",
   "Clicks an element",
@@ -223,6 +217,7 @@ server.tool(
   }
 );
 
+// --- Outil pour envoyer du texte à un élément ---
 server.tool(
   "send_keys",
   "Sends keys to an element (typing)",
@@ -241,6 +236,7 @@ server.tool(
   }
 );
 
+// --- Outil pour récupérer le texte d'un élément ---
 server.tool(
   "get_element_text",
   "Gets the text() of an element",
@@ -258,6 +254,7 @@ server.tool(
   }
 );
 
+// --- Outil pour survoler un élément ---
 server.tool(
   "hover",
   "Moves the mouse to hover over an element",
@@ -276,6 +273,7 @@ server.tool(
   }
 );
 
+// --- Outil pour effectuer un drag and drop ---
 server.tool(
   "drag_and_drop",
   "Drags an element and drops it onto another element",
@@ -300,6 +298,7 @@ server.tool(
   }
 );
 
+// --- Outil pour effectuer un double clic sur un élément ---
 server.tool(
   "double_click",
   "Performs a double click on an element",
@@ -318,6 +317,7 @@ server.tool(
   }
 );
 
+// --- Outil pour effectuer un clic droit sur un élément ---
 server.tool(
   "right_click",
   "Performs a right click (context click) on an element",
@@ -336,6 +336,7 @@ server.tool(
   }
 );
 
+// --- Outil pour simuler l'appui sur une touche du clavier ---
 server.tool(
   "press_key",
   "Simulates pressing a keyboard key",
@@ -352,6 +353,7 @@ server.tool(
   }
 );
 
+// --- Outil pour uploader un fichier via un input de type file ---
 server.tool(
   "upload_file",
   "Uploads a file using a file input element",
@@ -369,6 +371,7 @@ server.tool(
   }
 );
 
+// --- Outil pour capturer une capture d'écran ---
 server.tool(
   "take_screenshot",
   "Captures a screenshot of the current page",
@@ -380,7 +383,6 @@ server.tool(
       const driver = getDriver();
       const screenshot = await driver.takeScreenshot();
       if (outputPath) {
-        const fs = await import("fs");
         await fs.promises.writeFile(outputPath, screenshot, "base64");
         return { content: [{ type: "text", text: `Screenshot saved to ${outputPath}` }] };
       } else {
@@ -397,7 +399,7 @@ server.tool(
   }
 );
 
-// --- Définition d'une ressource pour afficher le statut du navigateur ---
+// --- Ressource pour afficher le statut du navigateur ---
 server.resource(
   "browser-status",
   new ResourceTemplate("browser-status://current"),
