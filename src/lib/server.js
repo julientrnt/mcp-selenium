@@ -82,23 +82,26 @@ import { Builder } from "selenium-webdriver";
 import { Options as ChromeOptions, ServiceBuilder } from "selenium-webdriver/chrome.js";
 import { Options as FirefoxOptions } from "selenium-webdriver/firefox.js";
 
-// Fonction utilitaire pour trouver le chemin de chromedriver
+// Fonction utilitaire pour trouver le chemin du binaire chromedriver
 function findChromeDriverPath() {
   const possiblePaths = [
-    process.env.CHROMEDRIVER_BIN,          // Utilise la variable d'environnement si définie
+    process.env.CHROMEDRIVER_BIN,             // via variable d'environnement
+    '/usr/bin/chromedriver',
     '/usr/lib/chromium/chromedriver',
-    '/usr/bin/chromedriver'
+    '/usr/bin/chromium-chromedriver',
+    '/usr/local/bin/chromedriver',
+    '/opt/chromium/chromedriver'
   ].filter(Boolean);
 
   for (const path of possiblePaths) {
     try {
       fs.accessSync(path, fs.constants.X_OK);
       return path;
-    } catch (e) {
-      // chemin inaccessible, on passe au suivant
+    } catch (err) {
+      // chemin inaccessible, on continue
     }
   }
-  throw new Error("Chromedriver executable not found in any known path");
+  throw new Error("Chromedriver executable not found in any known path. Veuillez vérifier son installation.");
 }
 
 server.tool(
@@ -115,12 +118,12 @@ server.tool(
       if (browser === "chrome") {
         const chromeOptions = new ChromeOptions();
 
-        // Définition explicite du binaire Chrome si CHROME_BIN est défini
+        // Spécifiez le binaire Chrome si la variable CHROME_BIN est définie
         if (process.env.CHROME_BIN) {
           chromeOptions.setChromeBinaryPath(process.env.CHROME_BIN);
         }
 
-        // Ajout d'arguments pour contourner les restrictions dans un conteneur
+        // Ajout des arguments nécessaires pour fonctionner dans un conteneur Alpine
         chromeOptions.addArguments(
           "--no-sandbox",
           "--disable-dev-shm-usage",
@@ -132,10 +135,10 @@ server.tool(
           chromeOptions.addArguments("--headless");
         }
         if (options.arguments) {
-          options.arguments.forEach((arg) => chromeOptions.addArguments(arg));
+          options.arguments.forEach(arg => chromeOptions.addArguments(arg));
         }
 
-        // Recherche du chemin de chromedriver
+        // Recherche du chemin du chromedriver
         const chromeDriverPath = findChromeDriverPath();
         const chromeService = new ServiceBuilder(chromeDriverPath);
 
@@ -150,7 +153,7 @@ server.tool(
           firefoxOptions.addArguments("--headless");
         }
         if (options.arguments) {
-          options.arguments.forEach((arg) => firefoxOptions.addArguments(arg));
+          options.arguments.forEach(arg => firefoxOptions.addArguments(arg));
         }
         driver = await builder.forBrowser("firefox").setFirefoxOptions(firefoxOptions).build();
       }
