@@ -4,25 +4,25 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import pkg from "selenium-webdriver";
 const { By, until } = pkg;  // Importation pour utiliser By et until
-import { Readable } from "stream";
+import { PassThrough } from "stream";
 
-// Création d'un flux d'entrée "dummy" qui implémente .on
-const dummyStdin = new Readable({
-  read() {
-    // Pas de données à lire
-  }
-});
+// Créez un flux stdin correct en utilisant un PassThrough et en y pipeant process.stdin
+const fixedStdin = new PassThrough();
+if (process.stdin && typeof process.stdin.on === "function") {
+  process.stdin.pipe(fixedStdin);
+} else {
+  // Si process.stdin n'est pas utilisable, fixedStdin restera un flux vide.
+  fixedStdin._read = () => {};
+}
 
 // --- Utiliser une classe personnalisée pour forcer l'initialisation de "tools" ---
 class McpServerFixed extends McpServer {
   constructor(options) {
     super(options);
-    // Si "tools" ou "tools.list" n'est pas défini, l'initialiser
     if (!this.tools || !this.tools.list) {
       this.tools = { list: [] };
     }
   }
-  // Surcharge de la méthode tool pour enregistrer les métadonnées dans tools.list
   tool(name, description, schema, handler) {
     this.tools.list.push({ name, description, schema });
     return super.tool(name, description, schema, handler);
@@ -90,7 +90,6 @@ import { Builder } from "selenium-webdriver";
 import { Options as ChromeOptions, ServiceBuilder } from "selenium-webdriver/chrome.js";
 import { Options as FirefoxOptions } from "selenium-webdriver/firefox.js";
 
-// Fonction pour trouver chromedriver
 function findChromeDriverPath() {
   const possiblePaths = [
     process.env.CHROMEDRIVER_BIN,
@@ -109,7 +108,6 @@ function findChromeDriverPath() {
   throw new Error("Chromedriver executable not found in any known path. Vérifiez son installation.");
 }
 
-// Créer le répertoire temporaire pour le profil utilisateur si nécessaire
 const chromeDataDir = "/tmp/chrome-data";
 if (!fs.existsSync(chromeDataDir)) {
   fs.mkdirSync(chromeDataDir, { recursive: true });
@@ -128,11 +126,7 @@ server.tool(
       let driver;
       if (browser === "chrome") {
         const chromeOptions = new ChromeOptions();
-
-        // Forcer le chemin du binaire : utiliser CHROME_BIN ou /usr/bin/chromium
         chromeOptions.setChromeBinaryPath(process.env.CHROME_BIN || "/usr/bin/chromium");
-
-        // Ajouter les flags indispensables pour un fonctionnement headless en tant que root
         chromeOptions.addArguments(
           "--headless",
           "--no-sandbox",
@@ -145,7 +139,6 @@ server.tool(
         }
         const chromeDriverPath = findChromeDriverPath();
         const chromeService = new ServiceBuilder(chromeDriverPath);
-
         driver = await builder
           .forBrowser("chrome")
           .setChromeOptions(chromeOptions)
@@ -196,7 +189,6 @@ server.tool(
   }
 );
 
-// --- Outils d'interaction avec les éléments ---
 server.tool(
   "find_element",
   "Finds an element",
@@ -420,7 +412,6 @@ server.resource(
   })
 );
 
-// --- Handler de nettoyage pour fermer les sessions du navigateur lors de l'arrêt ---
 async function cleanup() {
   for (const [sessionId, driver] of state.drivers) {
     try {
@@ -438,9 +429,8 @@ process.on("SIGTERM", cleanup);
 process.on("SIGINT", cleanup);
 
 // --- Démarrage du serveur via le transport Stdio ---
-// Passage du flux d'entrée "dummy" et de process.stdout au transport, avec un délai de connexion
 const transport = new StdioServerTransport({
-  stdin: dummyStdin,
+  stdin: fixedStdin,
   stdout: process.stdout,
   connectionTimeout: 30000
 });
