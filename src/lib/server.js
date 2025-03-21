@@ -3,23 +3,18 @@ import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import pkg from "selenium-webdriver";
-const { By, until } = pkg;  // Pour utiliser By et until
-
-// Création d'un objet dummy pour stdin
-const fakeStdin = {
-  on: (event, handler) => {
-    // Ne fait rien, ou vous pouvez logger si besoin
-  }
-};
+const { By, until } = pkg;  // Importation ajoutée pour utiliser By et until
 
 // --- Utiliser une classe personnalisée pour forcer l'initialisation de "tools" ---
 class McpServerFixed extends McpServer {
   constructor(options) {
     super(options);
+    // Si "tools" ou "tools.list" n'est pas défini, l'initialiser
     if (!this.tools || !this.tools.list) {
       this.tools = { list: [] };
     }
   }
+  // Surcharge de la méthode tool pour enregistrer les métadonnées dans tools.list
   tool(name, description, schema, handler) {
     this.tools.list.push({ name, description, schema });
     return super.tool(name, description, schema, handler);
@@ -48,12 +43,18 @@ const getDriver = () => {
 
 const getLocator = (by, value) => {
   switch (by.toLowerCase()) {
-    case "id":    return By.id(value);
-    case "css":   return By.css(value);
-    case "xpath": return By.xpath(value);
-    case "name":  return By.name(value);
-    case "tag":   return By.tagName(value);
-    case "class": return By.className(value);
+    case "id":
+      return By.id(value);
+    case "css":
+      return By.css(value);
+    case "xpath":
+      return By.xpath(value);
+    case "name":
+      return By.name(value);
+    case "tag":
+      return By.tagName(value);
+    case "class":
+      return By.className(value);
     default:
       throw new Error(`Unsupported locator strategy: ${by}`);
   }
@@ -76,17 +77,18 @@ const locatorSchema = {
 };
 
 // --- Outils de gestion du navigateur ---
-import fs from "fs";
+import fs from 'fs';
 import { Builder } from "selenium-webdriver";
 import { Options as ChromeOptions, ServiceBuilder } from "selenium-webdriver/chrome.js";
 import { Options as FirefoxOptions } from "selenium-webdriver/firefox.js";
 
+// Fonction pour trouver chromedriver
 function findChromeDriverPath() {
   const possiblePaths = [
     process.env.CHROMEDRIVER_BIN,
-    "/usr/bin/chromedriver",
-    "/usr/lib/chromium/chromedriver",
-    "/usr/bin/chromium-chromedriver"
+    '/usr/bin/chromedriver',
+    '/usr/lib/chromium/chromedriver',
+    '/usr/bin/chromium-chromedriver'
   ].filter(Boolean);
   for (const path of possiblePaths) {
     try {
@@ -99,7 +101,8 @@ function findChromeDriverPath() {
   throw new Error("Chromedriver executable not found in any known path. Vérifiez son installation.");
 }
 
-const chromeDataDir = "/tmp/chrome-data";
+// Créer le répertoire temporaire pour le profil utilisateur si nécessaire
+const chromeDataDir = '/tmp/chrome-data';
 if (!fs.existsSync(chromeDataDir)) {
   fs.mkdirSync(chromeDataDir, { recursive: true });
 }
@@ -117,7 +120,11 @@ server.tool(
       let driver;
       if (browser === "chrome") {
         const chromeOptions = new ChromeOptions();
-        chromeOptions.setChromeBinaryPath(process.env.CHROME_BIN || "/usr/bin/chromium");
+
+        // Forcer le chemin du binaire : utiliser CHROME_BIN ou /usr/bin/chromium
+        chromeOptions.setChromeBinaryPath(process.env.CHROME_BIN || '/usr/bin/chromium');
+
+        // Ajouter les flags indispensables pour un fonctionnement headless en tant que root
         chromeOptions.addArguments(
           "--headless",
           "--no-sandbox",
@@ -130,6 +137,7 @@ server.tool(
         }
         const chromeDriverPath = findChromeDriverPath();
         const chromeService = new ServiceBuilder(chromeDriverPath);
+
         driver = await builder
           .forBrowser("chrome")
           .setChromeOptions(chromeOptions)
@@ -180,6 +188,7 @@ server.tool(
   }
 );
 
+// --- Outils d'interaction avec les éléments ---
 server.tool(
   "find_element",
   "Finds an element",
@@ -403,6 +412,7 @@ server.resource(
   })
 );
 
+// --- Handler de nettoyage pour fermer les sessions du navigateur lors de l'arrêt ---
 async function cleanup() {
   for (const [sessionId, driver] of state.drivers) {
     try {
@@ -420,9 +430,5 @@ process.on("SIGTERM", cleanup);
 process.on("SIGINT", cleanup);
 
 // --- Démarrage du serveur via le transport Stdio ---
-const transport = new StdioServerTransport({
-  stdin: fakeStdin,
-  stdout: process.stdout,
-  connectionTimeout: 30000
-});
+const transport = new StdioServerTransport();
 await server.connect(transport);
