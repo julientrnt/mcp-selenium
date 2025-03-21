@@ -81,50 +81,71 @@ const locatorSchema = {
 // --- Outils de gestion du navigateur ---
 server.tool(
   "start_browser",
-  "Launches a browser session",
+  "Launches a browser session. For Chrome in Docker, always use headless mode and pass the following arguments: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] to ensure correct operation.",
   {
     browser: z.enum(["chrome", "firefox"]).describe("Browser to launch (chrome or firefox)"),
     options: browserOptionsSchema,
   },
   async ({ browser, options = {} }) => {
-    try {
-      let builder = new Builder();
-      let driver;
+  try {
+    let builder = new Builder();
+    let driver;
 
-      if (browser === "chrome") {
-        const chromeOptions = new ChromeOptions();
-        if (options.headless) {
-          chromeOptions.addArguments("--headless=new");
-        }
-        if (options.arguments) {
-          options.arguments.forEach((arg) => chromeOptions.addArguments(arg));
-        }
-        driver = await builder.forBrowser("chrome").setChromeOptions(chromeOptions).build();
-      } else {
-        const firefoxOptions = new FirefoxOptions();
-        if (options.headless) {
-          firefoxOptions.addArguments("--headless");
-        }
-        if (options.arguments) {
-          options.arguments.forEach((arg) => firefoxOptions.addArguments(arg));
-        }
-        driver = await builder.forBrowser("firefox").setFirefoxOptions(firefoxOptions).build();
+    if (browser === "chrome") {
+      const chromeOptions = new ChromeOptions();
+
+      // Arguments par défaut pour Docker
+      chromeOptions.addArguments("--headless=new");
+      chromeOptions.addArguments("--no-sandbox");
+      chromeOptions.addArguments("--disable-dev-shm-usage");
+      chromeOptions.addArguments("--disable-gpu");
+
+      // Si l'IA passe d'autres arguments → les ajouter aussi
+      if (options.arguments) {
+        options.arguments.forEach((arg) => chromeOptions.addArguments(arg));
       }
 
-      const sessionId = `${browser}_${Date.now()}`;
-      state.drivers.set(sessionId, driver);
-      state.currentSession = sessionId;
+      // Option pour headless supplémentaire (mais déjà forcé ci-dessus)
+      if (options.headless === false) {
+        // Si jamais l'IA demande explicitement PAS de headless → on ne force pas le headless
+        // Mais perso, je garderais headless tout le temps dans Docker pour être safe
+        chromeOptions.addArguments("--disable-headless");
+      }
 
-      return {
-        content: [{ type: "text", text: `Browser started with session_id: ${sessionId}` }],
-      };
-    } catch (e) {
-      return {
-        content: [{ type: "text", text: `Error starting browser: ${e.message}` }],
-      };
+      driver = await builder.forBrowser("chrome").setChromeOptions(chromeOptions).build();
+    } else {
+      const firefoxOptions = new FirefoxOptions();
+
+      // Par défaut, headless et options safe Docker
+      firefoxOptions.addArguments("--headless");
+      firefoxOptions.addArguments("--no-sandbox");
+      firefoxOptions.addArguments("--disable-dev-shm-usage");
+      firefoxOptions.addArguments("--disable-gpu");
+
+      if (options.arguments) {
+        options.arguments.forEach((arg) => firefoxOptions.addArguments(arg));
+      }
+
+      if (options.headless === false) {
+        firefoxOptions.addArguments("--disable-headless");
+      }
+
+      driver = await builder.forBrowser("firefox").setFirefoxOptions(firefoxOptions).build();
     }
+
+    const sessionId = `${browser}_${Date.now()}`;
+    state.drivers.set(sessionId, driver);
+    state.currentSession = sessionId;
+
+    return {
+      content: [{ type: "text", text: `Browser started with session_id: ${sessionId}` }],
+    };
+  } catch (e) {
+    return {
+      content: [{ type: "text", text: `Error starting browser: ${e.message}` }],
+    };
   }
-);
+}
 
 server.tool(
   "navigate",
