@@ -11,7 +11,7 @@ const serverPath = resolve(__dirname, '../src/lib/server.js');
 
 // Start the server
 const child = spawn('node', [serverPath], {
-    stdio: 'inherit'
+    stdio: 'pipe'
 });
 
 child.on('error', (error) => {
