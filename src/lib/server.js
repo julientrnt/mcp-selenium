@@ -90,9 +90,10 @@ server.tool(
     try {
       let builder = new Builder();
       let driver;
-
       if (browser === "chrome") {
         const chromeOptions = new ChromeOptions();
+        // Ajout des options indispensables dans un conteneur
+        chromeOptions.addArguments("--no-sandbox", "--disable-dev-shm-usage");
         if (options.headless) {
           chromeOptions.addArguments("--headless=new");
         }
