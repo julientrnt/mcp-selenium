@@ -3,9 +3,7 @@ import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import pkg from "selenium-webdriver";
-const { Builder, By, Key, until, Actions } = pkg;
-import { Options as ChromeOptions } from "selenium-webdriver/chrome.js";
-import { Options as FirefoxOptions } from "selenium-webdriver/firefox.js";
+
 
 // --- Utiliser une classe personnalisée pour forcer l'initialisation de "tools" ---
 class McpServerFixed extends McpServer {
