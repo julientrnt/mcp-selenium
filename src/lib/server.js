@@ -118,23 +118,21 @@ server.tool(
       if (browser === "chrome") {
         const chromeOptions = new ChromeOptions();
 
-        // Spécifier le binaire Chrome si CHROME_BIN est défini
-        if (process.env.CHROME_BIN) {
-          chromeOptions.setChromeBinaryPath(process.env.CHROME_BIN);
-        }
+        // Forcer le chemin du binaire Chrome :
+        // Si la variable CHROME_BIN n'est pas définie, utiliser /usr/bin/chromium
+        chromeOptions.setChromeBinaryPath(process.env.CHROME_BIN || '/usr/bin/chromium');
 
-        // Arguments pour permettre à Chrome de fonctionner en mode headless
+        // Ajouter les flags nécessaires pour headless et environnement sécurisé
         chromeOptions.addArguments(
           "--no-sandbox",
           "--disable-dev-shm-usage",
           "--disable-setuid-sandbox",
           "--disable-gpu",
-          "--remote-debugging-port=9222",
-          "--user-data-dir=/tmp/chrome-data" // Ajout du répertoire de profil temporaire
+          "--user-data-dir=/tmp/chrome-data"
         );
+        // Utiliser l'option headless classique
         if (options.headless) {
-          // Utiliser --headless=new peut être nécessaire pour les versions récentes
-          chromeOptions.addArguments("--headless=new");
+          chromeOptions.addArguments("--headless");
         }
         if (options.arguments) {
           options.arguments.forEach(arg => chromeOptions.addArguments(arg));
