@@ -95,12 +95,12 @@ server.tool(
       if (browser === "chrome") {
         const chromeOptions = new ChromeOptions();
 
-        // Spécifie le binaire de Chrome si défini
+        // Spécifier explicitement le chemin du binaire Chrome si défini
         if (process.env.CHROME_BIN) {
           chromeOptions.setChromeBinaryPath(process.env.CHROME_BIN);
         }
 
-        // Ajoute les arguments nécessaires pour tourner dans un conteneur
+        // Ajout d'arguments pour contourner les restrictions dans un conteneur
         chromeOptions.addArguments(
           "--no-sandbox",
           "--disable-dev-shm-usage",
@@ -115,10 +115,10 @@ server.tool(
           options.arguments.forEach((arg) => chromeOptions.addArguments(arg));
         }
 
-        // Utilise la variable d'environnement ou un chemin par défaut adapté à Alpine
-        const chromeDriverPath = process.env.CHROMEDRIVER_BIN || '/usr/bin/chromium-chromedriver';
-
+        // Utilisation de la variable d'environnement ou du chemin par défaut adapté à Alpine
+        const chromeDriverPath = process.env.CHROMEDRIVER_BIN || '/usr/bin/chromedriver';
         const chromeService = new ServiceBuilder(chromeDriverPath);
+
         driver = await builder
           .forBrowser("chrome")
           .setChromeOptions(chromeOptions)
