@@ -3,9 +3,7 @@ import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import pkg from "selenium-webdriver";
-const { Builder, By, Key, until, Actions } = pkg;
-import { Options as ChromeOptions } from "selenium-webdriver/chrome.js";
-import { Options as FirefoxOptions } from "selenium-webdriver/firefox.js";
+
 
 // --- Utiliser une classe personnalisée pour forcer l'initialisation de "tools" ---
 class McpServerFixed extends McpServer {
@@ -79,6 +77,33 @@ const locatorSchema = {
 };
 
 // --- Outils de gestion du navigateur ---
+import fs from 'fs';
+import { Builder } from "selenium-webdriver";
+import { Options as ChromeOptions, ServiceBuilder } from "selenium-webdriver/chrome.js";
+import { Options as FirefoxOptions } from "selenium-webdriver/firefox.js";
+
+// Fonction utilitaire pour trouver le chemin du chromedriver
+function findChromeDriverPath() {
+  const possiblePaths = [
+    process.env.CHROMEDRIVER_BIN,
+    '/usr/bin/chromedriver',
+    '/usr/lib/chromium/chromedriver',
+    '/usr/bin/chromium-chromedriver',
+    '/usr/local/bin/chromedriver',
+    '/opt/chromium/chromedriver'
+  ].filter(Boolean);
+
+  for (const path of possiblePaths) {
+    try {
+      fs.accessSync(path, fs.constants.X_OK);
+      return path;
+    } catch (err) {
+      // chemin inaccessible, on passe au suivant
+    }
+  }
+  throw new Error("Chromedriver executable not found in any known path. Veuillez vérifier son installation.");
+}
+
 server.tool(
   "start_browser",
   "Launches a browser session",
@@ -90,23 +115,46 @@ server.tool(
     try {
       let builder = new Builder();
       let driver;
-
       if (browser === "chrome") {
         const chromeOptions = new ChromeOptions();
+
+        // Spécifier le binaire Chrome si CHROME_BIN est défini
+        if (process.env.CHROME_BIN) {
+          chromeOptions.setChromeBinaryPath(process.env.CHROME_BIN);
+        }
+
+        // Arguments pour permettre à Chrome de fonctionner en mode headless
+        chromeOptions.addArguments(
+          "--no-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-setuid-sandbox",
+          "--disable-gpu",
+          "--remote-debugging-port=9222",
+          "--user-data-dir=/tmp/chrome-data" // Ajout du répertoire de profil temporaire
+        );
         if (options.headless) {
+          // Utiliser --headless=new peut être nécessaire pour les versions récentes
           chromeOptions.addArguments("--headless=new");
         }
         if (options.arguments) {
-          options.arguments.forEach((arg) => chromeOptions.addArguments(arg));
+          options.arguments.forEach(arg => chromeOptions.addArguments(arg));
         }
-        driver = await builder.forBrowser("chrome").setChromeOptions(chromeOptions).build();
+
+        const chromeDriverPath = findChromeDriverPath();
+        const chromeService = new ServiceBuilder(chromeDriverPath);
+
+        driver = await builder
+          .forBrowser("chrome")
+          .setChromeOptions(chromeOptions)
+          .setChromeService(chromeService)
+          .build();
       } else {
         const firefoxOptions = new FirefoxOptions();
         if (options.headless) {
           firefoxOptions.addArguments("--headless");
         }
         if (options.arguments) {
-          options.arguments.forEach((arg) => firefoxOptions.addArguments(arg));
+          options.arguments.forEach(arg => firefoxOptions.addArguments(arg));
         }
         driver = await builder.forBrowser("firefox").setFirefoxOptions(firefoxOptions).build();
       }
@@ -125,6 +173,7 @@ server.tool(
     }
   }
 );
+
 
 server.tool(
   "navigate",
