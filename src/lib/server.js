@@ -98,7 +98,7 @@ function findChromeDriverPath() {
       fs.accessSync(path, fs.constants.X_OK);
       return path;
     } catch (err) {
-      // chemin inaccessible, on passe au suivant
+      // Continuer vers le prochain chemin
     }
   }
   throw new Error("Chromedriver executable not found in any known path. Veuillez vérifier son installation.");
@@ -118,19 +118,20 @@ server.tool(
       if (browser === "chrome") {
         const chromeOptions = new ChromeOptions();
 
-        // Forcer le chemin du binaire Chrome :
-        // Si la variable CHROME_BIN n'est pas définie, utiliser /usr/bin/chromium
+        // Spécifier le binaire de Chrome : si CHROME_BIN n'est pas défini, forcer /usr/bin/chromium
         chromeOptions.setChromeBinaryPath(process.env.CHROME_BIN || '/usr/bin/chromium');
 
-        // Ajouter les flags nécessaires pour headless et environnement sécurisé
+        // Ajout des arguments indispensables pour un environnement headless en tant que root
         chromeOptions.addArguments(
           "--no-sandbox",
           "--disable-dev-shm-usage",
           "--disable-setuid-sandbox",
           "--disable-gpu",
+          "--remote-debugging-port=9222",
           "--user-data-dir=/tmp/chrome-data"
         );
-        // Utiliser l'option headless classique
+
+        // Si le mode headless est explicitement demandé, on l'ajoute (ici on utilise l'option classique)
         if (options.headless) {
           chromeOptions.addArguments("--headless");
         }
