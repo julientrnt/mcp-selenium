@@ -4,6 +4,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import pkg from "selenium-webdriver";
 const { By, until } = pkg;  // Importation ajoutée pour utiliser By et until
+import { PassThrough } from "stream";
 
 // --- Utiliser une classe personnalisée pour forcer l'initialisation de "tools" ---
 class McpServerFixed extends McpServer {
@@ -77,7 +78,7 @@ const locatorSchema = {
 };
 
 // --- Outils de gestion du navigateur ---
-import fs from 'fs';
+import fs from "fs";
 import { Builder } from "selenium-webdriver";
 import { Options as ChromeOptions, ServiceBuilder } from "selenium-webdriver/chrome.js";
 import { Options as FirefoxOptions } from "selenium-webdriver/firefox.js";
@@ -86,9 +87,9 @@ import { Options as FirefoxOptions } from "selenium-webdriver/firefox.js";
 function findChromeDriverPath() {
   const possiblePaths = [
     process.env.CHROMEDRIVER_BIN,
-    '/usr/bin/chromedriver',
-    '/usr/lib/chromium/chromedriver',
-    '/usr/bin/chromium-chromedriver'
+    "/usr/bin/chromedriver",
+    "/usr/lib/chromium/chromedriver",
+    "/usr/bin/chromium-chromedriver"
   ].filter(Boolean);
   for (const path of possiblePaths) {
     try {
@@ -102,7 +103,7 @@ function findChromeDriverPath() {
 }
 
 // Créer le répertoire temporaire pour le profil utilisateur si nécessaire
-const chromeDataDir = '/tmp/chrome-data';
+const chromeDataDir = "/tmp/chrome-data";
 if (!fs.existsSync(chromeDataDir)) {
   fs.mkdirSync(chromeDataDir, { recursive: true });
 }
@@ -122,7 +123,7 @@ server.tool(
         const chromeOptions = new ChromeOptions();
 
         // Forcer le chemin du binaire : utiliser CHROME_BIN ou /usr/bin/chromium
-        chromeOptions.setChromeBinaryPath(process.env.CHROME_BIN || '/usr/bin/chromium');
+        chromeOptions.setChromeBinaryPath(process.env.CHROME_BIN || "/usr/bin/chromium");
 
         // Ajouter les flags indispensables pour un fonctionnement headless en tant que root
         chromeOptions.addArguments(
@@ -430,9 +431,12 @@ process.on("SIGTERM", cleanup);
 process.on("SIGINT", cleanup);
 
 // --- Démarrage du serveur via le transport Stdio ---
-// Passage explicite de process.stdin et process.stdout ainsi que d'un délai de connexion
+// Création d'un flux stdin adapté via PassThrough
+const stdinStream = new PassThrough();
+process.stdin.pipe(stdinStream);
+
 const transport = new StdioServerTransport({
-  stdin: process.stdin,
+  stdin: stdinStream,
   stdout: process.stdout,
   connectionTimeout: 30000
 });
