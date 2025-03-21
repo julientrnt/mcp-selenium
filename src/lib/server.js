@@ -3,18 +3,16 @@ import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import pkg from "selenium-webdriver";
-const { By, until } = pkg;  // Importation ajoutée pour utiliser By et until
+const { By, until } = pkg; // Import de 'By' et 'until'
 
 // --- Utiliser une classe personnalisée pour forcer l'initialisation de "tools" ---
 class McpServerFixed extends McpServer {
   constructor(options) {
     super(options);
-    // Si "tools" ou "tools.list" n'est pas défini, l'initialiser
     if (!this.tools || !this.tools.list) {
       this.tools = { list: [] };
     }
   }
-  // Surcharge de la méthode tool pour enregistrer les métadonnées dans tools.list
   tool(name, description, schema, handler) {
     this.tools.list.push({ name, description, schema });
     return super.tool(name, description, schema, handler);
@@ -60,6 +58,18 @@ const getLocator = (by, value) => {
   }
 };
 
+// Fonction d'attente jusqu'à ce que le chargement de la page soit complet
+const waitForPageLoad = async (driver, timeout = 30000) => {
+  try {
+    await driver.wait(async () => {
+      const readyState = await driver.executeScript("return document.readyState");
+      return readyState === "complete";
+    }, timeout);
+  } catch (e) {
+    console.warn("Page load wait timed out:", e.message);
+  }
+};
+
 // --- Schémas communs ---
 const browserOptionsSchema = z
   .object({
@@ -82,7 +92,7 @@ import { Builder } from "selenium-webdriver";
 import { Options as ChromeOptions, ServiceBuilder } from "selenium-webdriver/chrome.js";
 import { Options as FirefoxOptions } from "selenium-webdriver/firefox.js";
 
-// Fonction pour trouver chromedriver
+// Fonction pour trouver le chemin de chromedriver
 function findChromeDriverPath() {
   const possiblePaths = [
     process.env.CHROMEDRIVER_BIN,
@@ -153,6 +163,12 @@ server.tool(
         }
         driver = await builder.forBrowser("firefox").setFirefoxOptions(firefoxOptions).build();
       }
+      // Configurer des timeouts généraux (chargement de page, script, etc.)
+      await driver.manage().setTimeouts({
+        implicit: 5000,
+        pageLoad: 30000,
+        script: 30000,
+      });
       const sessionId = `${browser}_${Date.now()}`;
       state.drivers.set(sessionId, driver);
       state.currentSession = sessionId;
@@ -176,10 +192,22 @@ server.tool(
   async ({ url }) => {
     try {
       const driver = getDriver();
-      await driver.get(url);
-      return {
-        content: [{ type: "text", text: `Navigated to ${url}` }],
-      };
+      // Tentative de navigation avec une logique de retry
+      const maxRetries = 3;
+      let attempt = 0;
+      let lastError;
+      while (attempt < maxRetries) {
+        try {
+          await driver.get(url);
+          await waitForPageLoad(driver); // Attendre que la page soit complètement chargée
+          return { content: [{ type: "text", text: `Navigated to ${url}` }] };
+        } catch (err) {
+          lastError = err;
+          attempt++;
+          console.warn(`Attempt ${attempt} to navigate failed: ${err.message}`);
+        }
+      }
+      throw new Error(`Navigation failed after ${maxRetries} attempts: ${lastError.message}`);
     } catch (e) {
       return {
         content: [{ type: "text", text: `Error navigating: ${e.message}` }],
@@ -197,7 +225,9 @@ server.tool(
     try {
       const driver = getDriver();
       const locator = getLocator(by, value);
-      await driver.wait(until.elementLocated(locator), timeout);
+      // Attendre que l'élément soit présent et visible
+      const element = await driver.wait(until.elementLocated(locator), timeout);
+      await driver.wait(until.elementIsVisible(element), timeout);
       return { content: [{ type: "text", text: "Element found" }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Error finding element: ${e.message}` }] };
@@ -214,6 +244,7 @@ server.tool(
       const driver = getDriver();
       const locator = getLocator(by, value);
       const element = await driver.wait(until.elementLocated(locator), timeout);
+      await driver.wait(until.elementIsVisible(element), timeout);
       await element.click();
       return { content: [{ type: "text", text: "Element clicked" }] };
     } catch (e) {
@@ -231,6 +262,7 @@ server.tool(
       const driver = getDriver();
       const locator = getLocator(by, value);
       const element = await driver.wait(until.elementLocated(locator), timeout);
+      await driver.wait(until.elementIsVisible(element), timeout);
       await element.clear();
       await element.sendKeys(text);
       return { content: [{ type: "text", text: `Text "${text}" entered into element` }] };
@@ -249,6 +281,7 @@ server.tool(
       const driver = getDriver();
       const locator = getLocator(by, value);
       const element = await driver.wait(until.elementLocated(locator), timeout);
+      await driver.wait(until.elementIsVisible(element), timeout);
       const text = await element.getText();
       return { content: [{ type: "text", text }] };
     } catch (e) {
@@ -266,6 +299,7 @@ server.tool(
       const driver = getDriver();
       const locator = getLocator(by, value);
       const element = await driver.wait(until.elementLocated(locator), timeout);
+      await driver.wait(until.elementIsVisible(element), timeout);
       const actions = driver.actions({ bridge: true });
       await actions.move({ origin: element }).perform();
       return { content: [{ type: "text", text: "Hovered over element" }] };
@@ -379,7 +413,6 @@ server.tool(
       const driver = getDriver();
       const screenshot = await driver.takeScreenshot();
       if (outputPath) {
-        const fs = await import("fs");
         await fs.promises.writeFile(outputPath, screenshot, "base64");
         return { content: [{ type: "text", text: `Screenshot saved to ${outputPath}` }] };
       } else {
