@@ -119,18 +119,24 @@ server.tool(
       if (browser === "chrome") {
         const chromeOptions = new ChromeOptions();
 
+        // Définir DBUS_SESSION_BUS_ADDRESS pour éviter certains messages d'erreur
+        process.env.DBUS_SESSION_BUS_ADDRESS = process.env.DBUS_SESSION_BUS_ADDRESS || "/dev/null";
+
         // Forcer le chemin du binaire : utiliser CHROME_BIN ou /usr/bin/chromium
-        chromeOptions.setChromeBinaryPath(process.env.CHROME_BIN || '/usr/bin/chromium');
+        const chromeBinary = process.env.CHROME_BIN || '/usr/bin/chromium';
+        chromeOptions.setChromeBinaryPath(chromeBinary);
 
         // Créer un répertoire de données utilisateur unique pour cette session
         const uniqueChromeDataDir = fs.mkdtempSync(path.join('/tmp', 'chrome-data-'));
 
         // Ajouter les flags indispensables pour un fonctionnement headless en tant que root
+        // On ajoute --use-gl=swiftshader pour forcer le rendu logiciel
         chromeOptions.addArguments(
           "--headless",
           "--no-sandbox",
           "--disable-dev-shm-usage",
           "--disable-gpu",
+          "--use-gl=swiftshader",
           `--user-data-dir=${uniqueChromeDataDir}`
         );
         if (options.arguments) {
@@ -258,151 +264,6 @@ server.tool(
       return { content: [{ type: "text", text }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Error getting element text: ${e.message}` }] };
-    }
-  }
-);
-
-// --- Outil pour survoler un élément ---
-server.tool(
-  "hover",
-  "Moves the mouse to hover over an element",
-  { ...locatorSchema },
-  async ({ by, value, timeout = 10000 }) => {
-    try {
-      const driver = getDriver();
-      const locator = getLocator(by, value);
-      const element = await driver.wait(until.elementLocated(locator), timeout);
-      const actions = driver.actions({ bridge: true });
-      await actions.move({ origin: element }).perform();
-      return { content: [{ type: "text", text: "Hovered over element" }] };
-    } catch (e) {
-      return { content: [{ type: "text", text: `Error hovering over element: ${e.message}` }] };
-    }
-  }
-);
-
-// --- Outil pour effectuer un drag and drop ---
-server.tool(
-  "drag_and_drop",
-  "Drags an element and drops it onto another element",
-  {
-    ...locatorSchema,
-    targetBy: z.enum(["id", "css", "xpath", "name", "tag", "class"]).describe("Locator strategy to find target element"),
-    targetValue: z.string().describe("Value for the target locator strategy"),
-  },
-  async ({ by, value, targetBy, targetValue, timeout = 10000 }) => {
-    try {
-      const driver = getDriver();
-      const sourceLocator = getLocator(by, value);
-      const targetLocator = getLocator(targetBy, targetValue);
-      const sourceElement = await driver.wait(until.elementLocated(sourceLocator), timeout);
-      const targetElement = await driver.wait(until.elementLocated(targetLocator), timeout);
-      const actions = driver.actions({ bridge: true });
-      await actions.dragAndDrop(sourceElement, targetElement).perform();
-      return { content: [{ type: "text", text: "Drag and drop completed" }] };
-    } catch (e) {
-      return { content: [{ type: "text", text: `Error performing drag and drop: ${e.message}` }] };
-    }
-  }
-);
-
-// --- Outil pour effectuer un double clic sur un élément ---
-server.tool(
-  "double_click",
-  "Performs a double click on an element",
-  { ...locatorSchema },
-  async ({ by, value, timeout = 10000 }) => {
-    try {
-      const driver = getDriver();
-      const locator = getLocator(by, value);
-      const element = await driver.wait(until.elementLocated(locator), timeout);
-      const actions = driver.actions({ bridge: true });
-      await actions.doubleClick(element).perform();
-      return { content: [{ type: "text", text: "Double click performed" }] };
-    } catch (e) {
-      return { content: [{ type: "text", text: `Error performing double click: ${e.message}` }] };
-    }
-  }
-);
-
-// --- Outil pour effectuer un clic droit sur un élément ---
-server.tool(
-  "right_click",
-  "Performs a right click (context click) on an element",
-  { ...locatorSchema },
-  async ({ by, value, timeout = 10000 }) => {
-    try {
-      const driver = getDriver();
-      const locator = getLocator(by, value);
-      const element = await driver.wait(until.elementLocated(locator), timeout);
-      const actions = driver.actions({ bridge: true });
-      await actions.contextClick(element).perform();
-      return { content: [{ type: "text", text: "Right click performed" }] };
-    } catch (e) {
-      return { content: [{ type: "text", text: `Error performing right click: ${e.message}` }] };
-    }
-  }
-);
-
-// --- Outil pour simuler l'appui sur une touche du clavier ---
-server.tool(
-  "press_key",
-  "Simulates pressing a keyboard key",
-  { key: z.string().describe("Key to press (e.g., 'Enter', 'Tab', 'a', etc.)") },
-  async ({ key }) => {
-    try {
-      const driver = getDriver();
-      const actions = driver.actions({ bridge: true });
-      await actions.keyDown(key).keyUp(key).perform();
-      return { content: [{ type: "text", text: `Key '${key}' pressed` }] };
-    } catch (e) {
-      return { content: [{ type: "text", text: `Error pressing key: ${e.message}` }] };
-    }
-  }
-);
-
-// --- Outil pour uploader un fichier via un input de type file ---
-server.tool(
-  "upload_file",
-  "Uploads a file using a file input element",
-  { ...locatorSchema, filePath: z.string().describe("Absolute path to the file to upload") },
-  async ({ by, value, filePath, timeout = 10000 }) => {
-    try {
-      const driver = getDriver();
-      const locator = getLocator(by, value);
-      const element = await driver.wait(until.elementLocated(locator), timeout);
-      await element.sendKeys(filePath);
-      return { content: [{ type: "text", text: "File upload initiated" }] };
-    } catch (e) {
-      return { content: [{ type: "text", text: `Error uploading file: ${e.message}` }] };
-    }
-  }
-);
-
-// --- Outil pour capturer une capture d'écran ---
-server.tool(
-  "take_screenshot",
-  "Captures a screenshot of the current page",
-  {
-    outputPath: z.string().optional().describe("Optional path where to save the screenshot. If not provided, returns base64 data."),
-  },
-  async ({ outputPath }) => {
-    try {
-      const driver = getDriver();
-      const screenshot = await driver.takeScreenshot();
-      if (outputPath) {
-        await fs.promises.writeFile(outputPath, screenshot, "base64");
-        return { content: [{ type: "text", text: `Screenshot saved to ${outputPath}` }] };
-      } else {
-        return {
-          content: [
-            { type: "text", text: "Screenshot captured as base64:" },
-            { type: "text", text: screenshot },
-          ],
-        };
-      }
-    } catch (e) {
-      return { content: [{ type: "text", text: `Error taking screenshot: ${e.message}` }] };
     }
   }
 );
