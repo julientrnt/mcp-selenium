@@ -2,13 +2,13 @@
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import fs from 'fs';
-import path from 'path';
+import fs from "fs";
+import path from "path";
 import { Builder, By, until } from "selenium-webdriver";
 import { Options as ChromeOptions, ServiceBuilder } from "selenium-webdriver/chrome.js";
 import { Options as FirefoxOptions } from "selenium-webdriver/firefox.js";
 
-// --- Utiliser une classe personnalisée pour forcer l'initialisation de "tools" ---
+// --- Classe personnalisée pour forcer l'initialisation de "tools" ---
 class McpServerFixed extends McpServer {
   constructor(options) {
     super(options);
@@ -24,7 +24,7 @@ class McpServerFixed extends McpServer {
 
 const server = new McpServerFixed({
   name: "MCP Selenium",
-  version: "1.0.0"
+  version: "1.0.0",
 });
 
 // --- État du serveur ---
@@ -35,7 +35,6 @@ const state = {
 
 // --- Fonctions utilitaires ---
 const getDriver = () => {
-  // Si aucune session active n'est définie mais qu'il y a des sessions, en sélectionne une
   if (!state.currentSession && state.drivers.size > 0) {
     state.currentSession = state.drivers.keys().next().value;
   }
@@ -85,9 +84,9 @@ const locatorSchema = {
 function findChromeDriverPath() {
   const possiblePaths = [
     process.env.CHROMEDRIVER_BIN,
-    '/usr/bin/chromedriver',
-    '/usr/lib/chromium/chromedriver',
-    '/usr/bin/chromium-chromedriver'
+    "/usr/bin/chromedriver",
+    "/usr/lib/chromium/chromedriver",
+    "/usr/bin/chromium-chromedriver",
   ].filter(Boolean);
   for (const pathCandidate of possiblePaths) {
     try {
@@ -110,8 +109,6 @@ server.tool(
   },
   async ({ browser, options = {} }) => {
     try {
-      console.log("Démarrage de start_browser avec options :", options);
-      // Si options est un tableau, on le convertit en objet avec la clé "arguments"
       if (Array.isArray(options)) {
         options = { arguments: options };
       }
@@ -120,56 +117,42 @@ server.tool(
       if (browser === "chrome") {
         const chromeOptions = new ChromeOptions();
 
-        // Forcer le chemin du binaire : utiliser CHROME_BIN ou /usr/bin/chromium
-        const chromeBinary = process.env.CHROME_BIN || '/usr/bin/chromium';
-        console.log("Chemin du binaire Chrome:", chromeBinary);
+        process.env.DBUS_SESSION_BUS_ADDRESS = process.env.DBUS_SESSION_BUS_ADDRESS || "/dev/null";
+        const chromeBinary = process.env.CHROME_BIN || "/usr/bin/chromium";
         chromeOptions.setChromeBinaryPath(chromeBinary);
 
-        // Créer un répertoire de données utilisateur unique pour cette session
-        const uniqueChromeDataDir = fs.mkdtempSync(path.join('/tmp', 'chrome-data-'));
-        console.log("Répertoire de données utilisateur :", uniqueChromeDataDir);
-
-        // Ajouter les flags indispensables pour un fonctionnement headless en tant que root
+        const uniqueChromeDataDir = fs.mkdtempSync(path.join("/tmp", "chrome-data-"));
         chromeOptions.addArguments(
           "--headless",
           "--no-sandbox",
           "--disable-dev-shm-usage",
           "--disable-gpu",
+          "--use-gl=swiftshader",
           `--user-data-dir=${uniqueChromeDataDir}`
         );
         if (options.arguments) {
-          options.arguments.forEach(arg => chromeOptions.addArguments(arg));
+          options.arguments.forEach((arg) => chromeOptions.addArguments(arg));
         }
         const chromeDriverPath = findChromeDriverPath();
-        console.log("Chemin du chromedriver :", chromeDriverPath);
         const chromeService = new ServiceBuilder(chromeDriverPath);
-
-        console.log("Construction du driver Chrome...");
-        driver = await builder
-          .forBrowser("chrome")
-          .setChromeOptions(chromeOptions)
-          .setChromeService(chromeService)
-          .build();
+        driver = await builder.forBrowser("chrome").setChromeOptions(chromeOptions).setChromeService(chromeService).build();
       } else {
         const firefoxOptions = new FirefoxOptions();
         if (options.headless) {
           firefoxOptions.addArguments("--headless");
         }
         if (options.arguments) {
-          options.arguments.forEach(arg => firefoxOptions.addArguments(arg));
+          options.arguments.forEach((arg) => firefoxOptions.addArguments(arg));
         }
-        console.log("Construction du driver Firefox...");
         driver = await builder.forBrowser("firefox").setFirefoxOptions(firefoxOptions).build();
       }
       const sessionId = `${browser}_${Date.now()}`;
       state.drivers.set(sessionId, driver);
       state.currentSession = sessionId;
-      console.log("Navigateur démarré avec la session :", sessionId);
       return {
         content: [{ type: "text", text: `Browser started with session_id: ${sessionId}` }],
       };
     } catch (e) {
-      console.error("Erreur lors du démarrage du navigateur :", e);
       return {
         content: [{ type: "text", text: `Error starting browser: ${e.message}` }],
       };
@@ -296,7 +279,9 @@ server.tool(
   "Drags an element and drops it onto another element",
   {
     ...locatorSchema,
-    targetBy: z.enum(["id", "css", "xpath", "name", "tag", "class"]).describe("Locator strategy to find target element"),
+    targetBy: z
+      .enum(["id", "css", "xpath", "name", "tag", "class"])
+      .describe("Locator strategy to find target element"),
     targetValue: z.string().describe("Value for the target locator strategy"),
   },
   async ({ by, value, targetBy, targetValue, timeout = 10000 }) => {
@@ -424,9 +409,7 @@ server.resource(
     contents: [
       {
         uri: uri.href,
-        text: state.currentSession
-          ? `Active browser session: ${state.currentSession}`
-          : "No active browser session",
+        text: state.currentSession ? `Active browser session: ${state.currentSession}` : "No active browser session",
       },
     ],
   })
