@@ -6,7 +6,8 @@ import fs from "fs";
 import path from "path";
 import { Builder, By, until } from "selenium-webdriver";
 import { Options as ChromeOptions, ServiceBuilder } from "selenium-webdriver/chrome.js";
-import { Options as FirefoxOptions, Profile as FirefoxProfile } from "selenium-webdriver/firefox.js";
+import firefox from "selenium-webdriver/firefox.js";
+const { Options: FirefoxOptions, Profile: FirefoxProfile } = firefox;
 
 // --- Classe personnalisée pour l'initialisation des tools ---
 class McpServerFixed extends McpServer {
