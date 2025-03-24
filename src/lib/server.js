@@ -441,5 +441,12 @@ process.on("SIGTERM", cleanup);
 process.on("SIGINT", cleanup);
 
 // --- Démarrage du serveur via le transport Stdio ---
-const transport = new StdioServerTransport();
-await server.connect(transport);
+(async () => {
+  const transport = new StdioServerTransport();
+  try {
+    await server.connect(transport);
+  } catch (e) {
+    console.error("Erreur lors de la connexion du serveur:", e);
+    process.exit(1);
+  }
+})();
