@@ -35,9 +35,13 @@ const state = {
 
 // --- Fonctions utilitaires ---
 const getDriver = () => {
+  // Si aucune session active n'est définie mais qu'il y a des sessions, en sélectionne une
+  if (!state.currentSession && state.drivers.size > 0) {
+    state.currentSession = state.drivers.keys().next().value;
+  }
   const driver = state.drivers.get(state.currentSession);
   if (!driver) {
-    throw new Error("No active browser session");
+    throw new Error("No active browser session. Please start a browser session using the start_browser tool.");
   }
   return driver;
 };
