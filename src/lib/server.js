@@ -6,15 +6,13 @@ import fs from "fs";
 import path from "path";
 import { Builder, By, until } from "selenium-webdriver";
 import { Options as ChromeOptions, ServiceBuilder } from "selenium-webdriver/chrome.js";
-import { Options as FirefoxOptions } from "selenium-webdriver/firefox.js";
+import { Options as FirefoxOptions, Profile as FirefoxProfile } from "selenium-webdriver/firefox.js";
 
-// --- Classe personnalisée pour forcer l'initialisation de "tools" ---
+// --- Classe personnalisée pour l'initialisation des tools ---
 class McpServerFixed extends McpServer {
   constructor(options) {
     super(options);
-    if (!this.tools || !this.tools.list) {
-      this.tools = { list: [] };
-    }
+    this.tools = this.tools && this.tools.list ? this.tools : { list: [] };
   }
   tool(name, description, schema, handler) {
     this.tools.list.push({ name, description, schema });
@@ -27,7 +25,7 @@ const server = new McpServerFixed({
   version: "1.0.0",
 });
 
-// --- État du serveur ---
+// --- État global ---
 const state = {
   drivers: new Map(),
   currentSession: null,
@@ -46,25 +44,22 @@ const getDriver = () => {
 };
 
 const getLocator = (by, value) => {
-  switch (by.toLowerCase()) {
-    case "id":
-      return By.id(value);
-    case "css":
-      return By.css(value);
-    case "xpath":
-      return By.xpath(value);
-    case "name":
-      return By.name(value);
-    case "tag":
-      return By.tagName(value);
-    case "class":
-      return By.className(value);
-    default:
-      throw new Error(`Unsupported locator strategy: ${by}`);
+  const strategies = {
+    id: By.id,
+    css: By.css,
+    xpath: By.xpath,
+    name: By.name,
+    tag: By.tagName,
+    class: By.className,
+  };
+  const strategy = strategies[by.toLowerCase()];
+  if (!strategy) {
+    throw new Error(`Unsupported locator strategy: ${by}`);
   }
+  return strategy(value);
 };
 
-// --- Schémas communs ---
+// --- Schémas de validation ---
 const browserOptionsSchema = z
   .object({
     headless: z.boolean().optional().describe("Run browser in headless mode"),
@@ -73,9 +68,7 @@ const browserOptionsSchema = z
   .optional();
 
 const locatorSchema = {
-  by: z
-    .enum(["id", "css", "xpath", "name", "tag", "class"])
-    .describe("Locator strategy to find element"),
+  by: z.enum(["id", "css", "xpath", "name", "tag", "class"]).describe("Locator strategy to find element"),
   value: z.string().describe("Value for the locator strategy"),
   timeout: z.number().optional().describe("Maximum time to wait for element in milliseconds"),
 };
@@ -88,10 +81,10 @@ function findChromeDriverPath() {
     "/usr/lib/chromium/chromedriver",
     "/usr/bin/chromium-chromedriver",
   ].filter(Boolean);
-  for (const pathCandidate of possiblePaths) {
+  for (const candidate of possiblePaths) {
     try {
-      fs.accessSync(pathCandidate, fs.constants.X_OK);
-      return pathCandidate;
+      fs.accessSync(candidate, fs.constants.X_OK);
+      return candidate;
     } catch (err) {
       // chemin non accessible, continuer
     }
@@ -109,26 +102,24 @@ server.tool(
   },
   async ({ browser, options = {} }) => {
     try {
-      if (Array.isArray(options)) {
-        options = { arguments: options };
-      }
-      let builder = new Builder();
+      if (Array.isArray(options)) options = { arguments: options };
+      const builder = new Builder();
       let driver;
+
       if (browser === "chrome") {
         const chromeOptions = new ChromeOptions();
-
         process.env.DBUS_SESSION_BUS_ADDRESS = process.env.DBUS_SESSION_BUS_ADDRESS || "/dev/null";
         const chromeBinary = process.env.CHROME_BIN || "/usr/bin/chromium";
         chromeOptions.setChromeBinaryPath(chromeBinary);
 
-        const uniqueChromeDataDir = fs.mkdtempSync(path.join("/tmp", "chrome-data-"));
+        const userDataDir = fs.mkdtempSync(path.join("/tmp", "chrome-data-"));
         chromeOptions.addArguments(
           "--headless",
           "--no-sandbox",
           "--disable-dev-shm-usage",
           "--disable-gpu",
           "--use-gl=swiftshader",
-          `--user-data-dir=${uniqueChromeDataDir}`
+          `--user-data-dir=${userDataDir}`
         );
         if (options.arguments) {
           options.arguments.forEach((arg) => chromeOptions.addArguments(arg));
@@ -137,7 +128,15 @@ server.tool(
         const chromeService = new ServiceBuilder(chromeDriverPath);
         driver = await builder.forBrowser("chrome").setChromeOptions(chromeOptions).setChromeService(chromeService).build();
       } else {
+        // Configuration similaire pour Firefox
         const firefoxOptions = new FirefoxOptions();
+        // Création d'un profil temporaire pour Firefox
+        const userDataDir = fs.mkdtempSync(path.join("/tmp", "firefox-profile-"));
+        const profile = new FirefoxProfile();
+        // On force Firefox à utiliser ce dossier pour le cache/disque
+        profile.setPreference("browser.cache.disk.parent_directory", userDataDir);
+        firefoxOptions.setProfile(profile);
+
         if (options.headless) {
           firefoxOptions.addArguments("--headless");
         }
@@ -149,40 +148,31 @@ server.tool(
       const sessionId = `${browser}_${Date.now()}`;
       state.drivers.set(sessionId, driver);
       state.currentSession = sessionId;
-      return {
-        content: [{ type: "text", text: `Browser started with session_id: ${sessionId}` }],
-      };
+      return { content: [{ type: "text", text: `Browser started with session_id: ${sessionId}` }] };
     } catch (e) {
-      return {
-        content: [{ type: "text", text: `Error starting browser: ${e.message}` }],
-      };
+      return { content: [{ type: "text", text: `Error starting browser: ${e.message}` }] };
     }
   }
 );
 
-// --- Outil pour naviguer vers une URL ---
+// --- Outils complémentaires (navigation, interaction, etc.) ---
+// Navigation vers une URL
 server.tool(
   "navigate",
   "Navigates to a URL",
-  {
-    url: z.string().describe("URL to navigate to"),
-  },
+  { url: z.string().describe("URL to navigate to") },
   async ({ url }) => {
     try {
       const driver = getDriver();
       await driver.get(url);
-      return {
-        content: [{ type: "text", text: `Navigated to ${url}` }],
-      };
+      return { content: [{ type: "text", text: `Navigated to ${url}` }] };
     } catch (e) {
-      return {
-        content: [{ type: "text", text: `Error navigating: ${e.message}` }],
-      };
+      return { content: [{ type: "text", text: `Error navigating: ${e.message}` }] };
     }
   }
 );
 
-// --- Outil pour trouver un élément ---
+// Recherche d'un élément
 server.tool(
   "find_element",
   "Finds an element",
@@ -199,7 +189,7 @@ server.tool(
   }
 );
 
-// --- Outil pour cliquer sur un élément ---
+// Clic sur un élément
 server.tool(
   "click_element",
   "Clicks an element",
@@ -217,7 +207,7 @@ server.tool(
   }
 );
 
-// --- Outil pour envoyer du texte à un élément ---
+// Envoi de texte à un élément
 server.tool(
   "send_keys",
   "Sends keys to an element (typing)",
@@ -236,7 +226,7 @@ server.tool(
   }
 );
 
-// --- Outil pour récupérer le texte d'un élément ---
+// Récupération du texte d'un élément
 server.tool(
   "get_element_text",
   "Gets the text() of an element",
@@ -254,7 +244,7 @@ server.tool(
   }
 );
 
-// --- Outil pour survoler un élément ---
+// Survol d'un élément
 server.tool(
   "hover",
   "Moves the mouse to hover over an element",
@@ -273,15 +263,13 @@ server.tool(
   }
 );
 
-// --- Outil pour effectuer un drag and drop ---
+// Drag and drop d'un élément
 server.tool(
   "drag_and_drop",
   "Drags an element and drops it onto another element",
   {
     ...locatorSchema,
-    targetBy: z
-      .enum(["id", "css", "xpath", "name", "tag", "class"])
-      .describe("Locator strategy to find target element"),
+    targetBy: z.enum(["id", "css", "xpath", "name", "tag", "class"]).describe("Locator strategy to find target element"),
     targetValue: z.string().describe("Value for the target locator strategy"),
   },
   async ({ by, value, targetBy, targetValue, timeout = 10000 }) => {
@@ -300,7 +288,7 @@ server.tool(
   }
 );
 
-// --- Outil pour effectuer un double clic sur un élément ---
+// Double-clic sur un élément
 server.tool(
   "double_click",
   "Performs a double click on an element",
@@ -319,7 +307,7 @@ server.tool(
   }
 );
 
-// --- Outil pour effectuer un clic droit sur un élément ---
+// Clic droit sur un élément
 server.tool(
   "right_click",
   "Performs a right click (context click) on an element",
@@ -338,7 +326,7 @@ server.tool(
   }
 );
 
-// --- Outil pour simuler l'appui sur une touche du clavier ---
+// Simulation de l'appui sur une touche
 server.tool(
   "press_key",
   "Simulates pressing a keyboard key",
@@ -355,7 +343,7 @@ server.tool(
   }
 );
 
-// --- Outil pour uploader un fichier via un input de type file ---
+// Upload d'un fichier
 server.tool(
   "upload_file",
   "Uploads a file using a file input element",
@@ -373,7 +361,7 @@ server.tool(
   }
 );
 
-// --- Outil pour capturer une capture d'écran ---
+// Capture d'écran
 server.tool(
   "take_screenshot",
   "Captures a screenshot of the current page",
@@ -401,7 +389,7 @@ server.tool(
   }
 );
 
-// --- Ressource pour afficher le statut du navigateur ---
+// Ressource pour afficher le statut du navigateur
 server.resource(
   "browser-status",
   new ResourceTemplate("browser-status://current"),
@@ -415,7 +403,7 @@ server.resource(
   })
 );
 
-// --- Handler de nettoyage pour fermer les sessions du navigateur lors de l'arrêt ---
+// --- Gestion du nettoyage ---
 async function cleanup() {
   for (const [sessionId, driver] of state.drivers) {
     try {
